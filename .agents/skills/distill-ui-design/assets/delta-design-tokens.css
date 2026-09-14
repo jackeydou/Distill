@@ -1,0 +1,59 @@
+/* Extracted from https://delta.dev/docs/getting-started on 2026-09-18.
+   Semantic colors and font stacks follow the live CSS.
+   Spacing/type aliases below normalize measured page values for reuse.
+   Supply licensed/self-hosted font files separately. */
+:root {
+  --delta-neutral: oklch(53% .02 259);
+  --delta-cream: oklch(60% .1 75);
+  --delta-brand: oklch(59% .185 32);
+  --delta-blue: #346dae;
+  --ui-font-display: "IBM Plex Serif", ui-serif, Georgia, serif;
+  --ui-font-body: "iA Writer Quattro S", ui-sans-serif, system-ui, sans-serif;
+  --ui-font-interface: "Lilex", ui-monospace, "SF Mono", Menlo, monospace;
+  --ui-background-subtle: color-mix(in oklch, var(--delta-cream), white 95%);
+  --ui-background-canvas: color-mix(in oklch, var(--delta-cream), white 85%);
+  --ui-background-strong: color-mix(in oklch, var(--ui-background-canvas), white 50%);
+  --ui-text: color-mix(in oklch, var(--delta-neutral), black 40%);
+  --ui-text-subtle: color-mix(in oklch, var(--delta-neutral), black 12%);
+  --ui-text-brand: color-mix(in oklch, var(--delta-brand), black 20%);
+  --ui-border-subtle: color-mix(in oklch, var(--delta-neutral), white 50%);
+  --ui-accent: var(--delta-brand);
+  --ui-accent-subtle: color-mix(in oklch, var(--delta-brand), transparent 90%);
+  --ui-primary-background: color-mix(in oklch, var(--delta-brand), black 8%);
+  --ui-primary-background-hover: color-mix(in oklch, var(--delta-brand), black 20%);
+  --ui-primary-text: var(--ui-background-subtle);
+  --ui-focus-ring: color-mix(in oklch, var(--delta-brand), white 70%);
+  --ui-error: oklch(52% .17 25);
+  --ui-success: oklch(51% .11 155);
+  --ui-warning: oklch(59% .13 73);
+  --ui-radius-control: 0;
+  --ui-radius-surface: 0;
+  --ui-shadow-surface: none;
+  /* Page-level values; these alias names are proposed, not original tokens. */
+  --docs-panel-radius: 2px;
+  --docs-border-width: 1px;
+  --docs-sidebar-width: 17.75rem;
+  --docs-prose-max-width: 48rem;
+  --docs-shell-gap: 1rem;
+  --docs-card-gap: .75rem;
+  --docs-body-size: 1rem;
+  --docs-body-leading: 1.75;
+  --docs-nav-size: .8125rem;
+  --docs-label-size: .6875rem;
+  --docs-heading-tracking: -.025em;
+  --docs-transition-duration: 150ms;
+}
+.dark {
+  --ui-text: color-mix(in oklch, var(--delta-neutral), white 94%);
+  --ui-text-subtle: color-mix(in oklch, var(--delta-neutral), white 50%);
+  --ui-text-brand: var(--delta-brand);
+  --ui-background-canvas: color-mix(in oklch, var(--delta-brand), black 88%);
+  --ui-background-subtle: color-mix(in oklch, var(--delta-neutral), black 70%);
+  --ui-background-strong: color-mix(in oklch, color-mix(in oklch, var(--delta-neutral), black 55%), black 50%);
+  --ui-border-subtle: color-mix(in oklch, color-mix(in oklch, var(--delta-neutral), black 40%), black 20%);
+  --ui-primary-text: color-mix(in oklch, var(--delta-cream), white 95%);
+  --ui-focus-ring: color-mix(in oklch, var(--delta-brand), white 40%);
+  --ui-error: color-mix(in oklch, oklch(52% .17 25), white 18%);
+  --ui-success: color-mix(in oklch, oklch(51% .11 155), white 20%);
+  --ui-warning: color-mix(in oklch, oklch(59% .13 73), white 18%);
+}
