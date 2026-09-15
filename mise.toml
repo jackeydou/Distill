@@ -1,0 +1,14 @@
+[tools]
+rust = { version = "1.95", components = "rustfmt,clippy" }
+
+[tasks.fmt]
+description = "Format all Rust code"
+run = "cargo fmt --all"
+
+[tasks.check]
+description = "Everything a change must pass before it is done"
+run = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "cargo test --workspace",
+]
