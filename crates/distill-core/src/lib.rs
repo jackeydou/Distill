@@ -4,5 +4,6 @@
 pub mod config;
 pub mod error;
 mod fsutil;
+pub mod model;
 
 pub use error::{Error, Result};
