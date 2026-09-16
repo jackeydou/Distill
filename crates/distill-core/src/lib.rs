@@ -5,6 +5,7 @@ pub mod config;
 pub mod error;
 mod fsutil;
 pub mod model;
+pub mod redact;
 pub mod vault;
 
 pub use error::{Error, Result};
