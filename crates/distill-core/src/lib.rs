@@ -4,6 +4,7 @@
 pub mod config;
 pub mod error;
 mod fsutil;
+pub mod index;
 pub mod model;
 pub mod redact;
 pub mod tags;

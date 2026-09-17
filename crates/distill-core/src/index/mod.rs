@@ -1,0 +1,56 @@
+//! The per-device SQLite index. It is derived from the vault and safe to delete.
+//!
+//! Several processes open it at once (one `distill mcp` per agent session, the CLI, the
+//! web server), so it runs in WAL mode with a busy timeout, and every sync writes inside
+//! one immediate transaction.
+
+mod scan;
+
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+use std::time::Duration;
+
+use rusqlite::Connection;
+use rusqlite_migration::{M, Migrations};
+
+use crate::error::{IoContext, Result};
+
+pub use scan::SyncReport;
+
+static MIGRATIONS: LazyLock<Migrations<'static>> =
+    LazyLock::new(|| Migrations::new(vec![M::up(include_str!("../../migrations/0001_init.sql"))]));
+
+pub struct Index {
+    conn: Connection,
+    vault_root: PathBuf,
+}
+
+impl Index {
+    pub fn open(db_path: &Path, vault_root: &Path) -> Result<Self> {
+        if let Some(dir) = db_path.parent() {
+            std::fs::create_dir_all(dir).at(dir)?;
+        }
+        let mut conn = Connection::open(db_path)?;
+        conn.busy_timeout(Duration::from_secs(5))?;
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.pragma_update(None, "synchronous", "NORMAL")?;
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        MIGRATIONS.to_latest(&mut conn)?;
+        Ok(Self {
+            conn,
+            vault_root: vault_root.to_path_buf(),
+        })
+    }
+
+    /// Brings the index up to date with the vault: new and changed files are parsed,
+    /// deleted files are dropped. Unchanged files cost one `stat`.
+    pub fn sync(&mut self) -> Result<SyncReport> {
+        scan::sync(&mut self.conn, &self.vault_root, false)
+    }
+
+    /// Drops every row and re-reads the whole vault.
+    pub fn rebuild(&mut self) -> Result<SyncReport> {
+        scan::sync(&mut self.conn, &self.vault_root, true)
+    }
+}
+
