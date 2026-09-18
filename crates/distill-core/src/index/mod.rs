@@ -4,6 +4,8 @@
 //! web server), so it runs in WAL mode with a busy timeout, and every sync writes inside
 //! one immediate transaction.
 
+mod query;
+mod recall;
 mod scan;
 
 use std::path::{Path, PathBuf};
@@ -15,6 +17,10 @@ use rusqlite_migration::{M, Migrations};
 
 use crate::error::{IoContext, Result};
 
+pub use query::{
+    AnnotationView, Conflict, InvalidFile, NoteHit, NoteView, ProjectCount, RecallResult,
+    RecallTopic, Stats, TagCount, TopicCount, WeekCount,
+};
 pub use scan::SyncReport;
 
 static MIGRATIONS: LazyLock<Migrations<'static>> =
@@ -54,3 +60,5 @@ impl Index {
     }
 }
 
+#[cfg(test)]
+mod tests;
