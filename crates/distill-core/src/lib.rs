@@ -6,8 +6,10 @@ pub mod error;
 mod fsutil;
 pub mod index;
 pub mod model;
+pub mod ops;
 pub mod redact;
 pub mod tags;
 pub mod vault;
 
 pub use error::{Error, Result};
+pub use ops::Distill;
