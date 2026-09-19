@@ -44,7 +44,7 @@ a rule an agent must not miss → this file, linking its home.
   the packages involved.
 - **Vault file format** — Markdown files in the vault are the user's data; SQLite is a rebuildable
   index. A change to the file format bumps its `schema` version and must still read older files.
-  Ask about compatibility before changing it. Format: [spec D2](spec/2026-09-13-distill-foundation/README.md).
+  Ask about compatibility before changing it. Format: [docs/vault-format.md](docs/vault-format.md).
 - **Index migrations** — add a new numbered SQL file under `crates/distill-core/migrations/`. Never
   edit one that has shipped. The index can be rebuilt from the vault, so a migration may drop and
   recreate tables instead of transforming rows.
