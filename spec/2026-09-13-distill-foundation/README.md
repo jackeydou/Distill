@@ -229,6 +229,11 @@ PGlite 是单连接的 WASM Postgres，一个数据目录同一时间只能被�
 agent 判断是不是同一个问题。它本来就是 LLM，判断语义等价比阈值可靠。等出现"明明问过却没
 匹配上"的情况，再加 embedding 提高候选召回。
 
+> **2026-09-13 实现备注（P1）。** recall 没有走 trigram FTS：换了说法的问题很少与旧问题有三个
+> 连续相同的字（"加载扩展" 对 "加载不了扩展"），冒烟测试里直接漏召回。改为在内存里对全部 note
+> 按中文二字组和英文单词打分，按 IDF 加权，标题和问题里的命中权重加倍，覆盖不到问题总权重
+> 25% 的丢弃。关键词搜索仍用 trigram FTS。实现：`crates/distill-core/src/index/recall.rs`。
+
 照搬 reflect-open 的 `retrieve()`：一个函数提供 keyword / semantic / hybrid 三种模式，hybrid
 用 RRF 融合，低于相似度阈值的丢弃。embedding 不可用时自动退回 FTS。
 
