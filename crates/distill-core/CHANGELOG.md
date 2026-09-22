@@ -14,3 +14,4 @@
 - Stats by topic, tag, ISO week and project.
 - Secret redaction on every prose field before it is written.
 - `init`, `annotate`, `move_vault`, `use_vault` and `doctor` operations.
+- `schema` feature: JSON Schema for `SaveRequest`, used as the MCP tool schema.

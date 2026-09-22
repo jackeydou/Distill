@@ -155,22 +155,33 @@ pub fn expand_vault_arg(arg: &str) -> Result<PathBuf> {
     Ok(PathBuf::from(arg))
 }
 
+/// One note to save. Field descriptions double as the MCP tool schema.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct SaveRequest {
+    /// One line naming the question, in the user's language.
     pub title: String,
+    /// The underlying question the user wanted answered.
     pub question: String,
+    /// The answer the conversation arrived at.
     pub conclusion: String,
+    /// Short supporting points worth remembering.
     #[serde(default)]
     pub key_points: Vec<String>,
+    /// What is still unclear or was left unanswered.
     #[serde(default)]
     pub open_questions: Vec<String>,
-    /// An existing topic id from recall, or `"new"`.
+    /// The topic id from `distill_recall` when this is the same question asked before;
+    /// otherwise `"new"`.
     pub topic: String,
+    /// Existing tags only (from the tag list `distill_recall` returns).
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Tags to create, only when no existing tag fits.
     #[serde(default)]
     pub new_tags: Vec<String>,
+    /// Set after a "close to existing tag" error, when the new tag really is different.
     #[serde(default)]
     pub confirm_new: bool,
     pub source: Source,
