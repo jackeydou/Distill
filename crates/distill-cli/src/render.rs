@@ -155,6 +155,26 @@ pub fn doctor(r: &DoctorReport) -> String {
             .as_ref()
             .map_or("not recorded".into(), |p| p.display().to_string()),
     );
+    let plugins = r
+        .plugins
+        .iter()
+        .map(|p| {
+            format!(
+                "{} {} {}",
+                p.agent.as_str(),
+                p.id,
+                p.version.as_deref().unwrap_or("?")
+            )
+        })
+        .collect::<Vec<_>>();
+    out.push_str(&format!(
+        "Plugins: {}\n",
+        if plugins.is_empty() {
+            "none".to_string()
+        } else {
+            plugins.join(", ")
+        }
+    ));
     if r.ok {
         out.push_str("\nAll good.");
         return out;

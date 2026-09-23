@@ -20,7 +20,10 @@ impl Env {
     fn cmd(&self, args: &[&str]) -> Command {
         let mut cmd = Command::cargo_bin("distill").unwrap();
         cmd.env("DISTILL_HOME", self.dir.path().join("home"))
+            .env("CODEX_HOME", self.dir.path().join("codex"))
+            .env("CLAUDE_CONFIG_DIR", self.dir.path().join("claude"))
             .env_remove("DISTILL_VAULT")
+            .env_remove("CLAUDE_CODE_SESSION_ID")
             .args(args);
         cmd
     }
@@ -133,8 +136,21 @@ fn search_tags_annotate_and_doctor() {
         "一写多读，写之间要排队"
     );
 
+    let out = env.cmd(&["doctor"]).output().unwrap();
+    assert!(!out.status.success());
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("plugin is not installed"), "{text}");
+
+    let plugins = env.dir.path().join("claude/plugins");
+    std::fs::create_dir_all(&plugins).unwrap();
+    std::fs::write(
+        plugins.join("installed_plugins.json"),
+        r#"{"version":2,"plugins":{"distill@distill":[{"version":"0.0.1"}]}}"#,
+    )
+    .unwrap();
     let doctor = env.json(&["doctor"]);
     assert_eq!(doctor["ok"], true);
+    assert_eq!(doctor["plugins"][0]["agent"], "claude-code");
 }
 
 #[test]

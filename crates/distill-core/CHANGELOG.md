@@ -14,4 +14,7 @@
 - Stats by topic, tag, ISO week and project.
 - Secret redaction on every prose field before it is written.
 - `init`, `annotate`, `move_vault`, `use_vault` and `doctor` operations.
+- `sources`: agent detection from hook input, the hook's injected context, source
+  verification against Codex rollouts and `CLAUDE_CODE_SESSION_ID`, reopen links, and
+  detection of the installed plugin. `doctor` reports a missing plugin.
 - `schema` feature: JSON Schema for `SaveRequest`, used as the MCP tool schema.

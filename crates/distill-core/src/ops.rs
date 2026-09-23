@@ -12,6 +12,7 @@ use crate::fsutil::{content_hash, now_rfc3339};
 use crate::index::{Conflict, Index, InvalidFile, SyncReport};
 use crate::model::{AnnotationMeta, NoteBody, NoteMeta, SCHEMA, Source, TopicMeta};
 use crate::redact::redact;
+use crate::sources::{InstalledPlugin, SourceEnv, installed_plugins};
 use crate::tags::{MAX_TAGS_PER_NOTE, normalize, resolve_alias, similar_to, suggestions};
 use crate::vault::{Vault, new_id};
 
@@ -396,6 +397,14 @@ impl Distill {
                 bin.display()
             ));
         }
+        let (plugins, plugin_problems) = installed_plugins(&SourceEnv::from_process());
+        problems.extend(plugin_problems);
+        if plugins.is_empty() {
+            problems.push(
+                "the Distill plugin is not installed in Codex or Claude Code; see INSTALL.md"
+                    .into(),
+            );
+        }
         if !conflicts.is_empty() {
             problems.push(format!(
                 "{} sync conflict(s): the same id appears in several files",
@@ -417,6 +426,7 @@ impl Distill {
             index_file: self.dirs.index_file(self.vault.id()),
             bin_path: self.config.bin_path.clone(),
             ui_port: self.config.ui.port,
+            plugins,
             conflicts,
             invalid_files,
         })
@@ -433,6 +443,7 @@ pub struct DoctorReport {
     pub index_file: PathBuf,
     pub bin_path: Option<PathBuf>,
     pub ui_port: u16,
+    pub plugins: Vec<InstalledPlugin>,
     pub conflicts: Vec<Conflict>,
     pub invalid_files: Vec<InvalidFile>,
 }
