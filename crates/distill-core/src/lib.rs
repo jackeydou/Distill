@@ -8,6 +8,7 @@ pub mod index;
 pub mod model;
 pub mod ops;
 pub mod redact;
+pub mod sources;
 pub mod tags;
 pub mod vault;
 
