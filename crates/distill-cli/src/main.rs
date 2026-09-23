@@ -1,3 +1,4 @@
+mod hook;
 mod render;
 
 use std::io::{IsTerminal, Read, Write};
@@ -82,6 +83,15 @@ enum Command {
     Config(ConfigCommand),
     /// Check the vault, index and setup, and list what needs attention.
     Doctor,
+    /// Hook entry points. Run by the Distill plugin; always exit 0.
+    #[command(subcommand)]
+    Hook(HookEvent),
+}
+
+#[derive(Subcommand)]
+enum HookEvent {
+    /// Reads the hook JSON on stdin and prints the context to inject.
+    UserPromptSubmit,
 }
 
 #[derive(Subcommand)]
@@ -174,6 +184,10 @@ fn run(cli: Cli) -> Result<()> {
         }
         Command::Vault(cmd) => vault(cmd, json),
         Command::Config(cmd) => config(cmd, json),
+        Command::Hook(HookEvent::UserPromptSubmit) => {
+            hook::user_prompt_submit();
+            Ok(())
+        }
         Command::Doctor => {
             let report = Distill::open()?.doctor()?;
             emit(json, &report, render::doctor)?;

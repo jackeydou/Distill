@@ -12,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
-distill-core = { version = "0.0.1", path = "../distill-core" }
+distill-core = { version = "0.0.1", path = "../distill-core", features = ["schema"] }
 serde = "1.0.229"
 serde_json = "1.0.151"
 
