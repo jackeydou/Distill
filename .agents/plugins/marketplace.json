@@ -1,0 +1,20 @@
+{
+  "name": "distill",
+  "interface": {
+    "displayName": "Distill"
+  },
+  "plugins": [
+    {
+      "name": "distill",
+      "source": {
+        "source": "local",
+        "path": "./plugins/distill"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
