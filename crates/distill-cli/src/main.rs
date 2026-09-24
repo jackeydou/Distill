@@ -1,4 +1,5 @@
 mod hook;
+mod mcp;
 mod render;
 
 use std::io::{IsTerminal, Read, Write};
@@ -83,6 +84,8 @@ enum Command {
     Config(ConfigCommand),
     /// Check the vault, index and setup, and list what needs attention.
     Doctor,
+    /// Run the MCP server on stdio. Started by the Distill plugin, one per agent session.
+    Mcp,
     /// Hook entry points. Run by the Distill plugin; always exit 0.
     #[command(subcommand)]
     Hook(HookEvent),
@@ -184,6 +187,10 @@ fn run(cli: Cli) -> Result<()> {
         }
         Command::Vault(cmd) => vault(cmd, json),
         Command::Config(cmd) => config(cmd, json),
+        Command::Mcp => tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?
+            .block_on(mcp::serve()),
         Command::Hook(HookEvent::UserPromptSubmit) => {
             hook::user_prompt_submit();
             Ok(())
