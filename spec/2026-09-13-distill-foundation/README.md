@@ -267,6 +267,12 @@ plugins/distill/
   skills/distill/SKILL.md   # agent 的全部行为规则，见 D12
 ```
 
+> **2026-09-19 实现备注（P2）。** MCP 配置没有两边共用一份 `.mcp.json`：Claude Code 会自动加载
+> 插件根目录的 `.mcp.json`，而 Codex 的写法是 `cwd: "."` 加相对路径，两边写法不兼容。所以 Claude
+> Code 在 `plugin.json` 里内联声明，Codex 用 `codex.mcp.json`。hook 共用 `hooks/hooks.json`：
+> Codex 同样展开 `${CLAUDE_PLUGIN_ROOT}`（见 Codex 二进制内的变量表）。Claude Code 里 skill 的
+> 调用名是 `/distill:distill`。现状见 `docs/plugin.md`。
+
 **安装方式：用户自己装，`distill` 不改 agent 的配置**（2026-09-13 讨论确定）。仓库同时提供
 Codex 和 Claude Code 的插件 marketplace，两边都支持从 Git 仓库添加：
 

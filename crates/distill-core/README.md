@@ -14,11 +14,12 @@ the per-device SQLite index derived from it, and the operations that read and wr
 | `Distill::save` | Validate a `SaveRequest`, write topic and note files, return `SaveResult` |
 | `Distill::annotate` | Add an annotation to a note |
 | `Distill::move_vault` / `use_vault` | Copy the vault elsewhere, or switch to another vault |
-| `Distill::doctor` | Paths, conflicts, unreadable files |
+| `Distill::doctor` | Paths, installed plugin, conflicts, unreadable files |
 | `Index::recall` | Topics that resemble a question, with all their notes, annotations and every tag in use |
 | `Index::search` | Keyword search, optionally filtered by tag |
 | `Index::stats` / `tags` | Counts by topic, tag, ISO week and project |
 | `redact::redact` | Secret redaction applied before anything reaches the vault |
+| `sources` | Hook input and agent detection, injected context, source verification, reopen links, installed-plugin detection |
 
 File formats: [docs/vault-format.md](../../docs/vault-format.md).
 

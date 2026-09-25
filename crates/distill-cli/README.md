@@ -29,7 +29,9 @@ existing vault.
 | `reindex` | Rebuild this device's index from the vault |
 | `vault show \| use <dir> \| move <dir>` | Show, switch, or copy-and-switch the vault |
 | `config list \| get <key> \| set <key> <value>` | Settable keys: `ui.port`, `suggest.enabled` |
-| `doctor` | Paths, conflicts, unreadable files; exits non-zero when something needs attention |
+| `doctor` | Paths, plugin install, conflicts, unreadable files; exits non-zero when something needs attention |
+| `mcp` | Stdio MCP server for the plugin ([docs/plugin.md](../../docs/plugin.md)) |
+| `hook user-prompt-submit` | Hook entry point for the plugin; always exits 0 |
 
 The `SaveRequest` fields and tag rules are in the
 [distill-core README](../distill-core/README.md#save-contract).
@@ -40,3 +42,5 @@ The `SaveRequest` fields and tag rules are in the
 |---|---|
 | `DISTILL_HOME` | Use `$DISTILL_HOME/config` and `$DISTILL_HOME/data` instead of the platform directories |
 | `DISTILL_VAULT` | Use this vault instead of the configured one |
+| `CODEX_HOME` | Codex state directory (default `~/.codex`), for source checks and `doctor` |
+| `CLAUDE_CONFIG_DIR` | Claude Code state directory (default `~/.claude`), for `doctor` |

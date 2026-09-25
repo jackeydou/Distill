@@ -19,10 +19,16 @@ whole workspace. A change is not done until it passes.
 | `crates/distill-core` | Library: vault files, SQLite index, operations shared by every front end |
 | `crates/distill-cli` | The `distill` binary |
 | `crates/distill-core/migrations` | Index schema as numbered SQL files |
+| `plugins/distill` | Codex / Claude Code plugin ([plugin.md](plugin.md)) |
+| `.claude-plugin/`, `.agents/plugins/` | Marketplaces listing the plugin |
 | `spec/` | One directory per decision ([spec/AGENTS.md](../spec/AGENTS.md)) |
 | `.agents/skills/` | Skills for agents working in this repo |
 
-The web UI (`apps/web`) and the agent plugin (`plugins/distill`) arrive in later phases.
+The web UI (`apps/web`) arrives in a later phase.
+
+To try the plugin from this checkout, add the repo as a local marketplace:
+`claude plugin marketplace add .` or `codex plugin marketplace add .`, then install
+`distill@distill`. Tests cover the manifests in `crates/distill-cli/tests/plugin.rs`.
 
 ## Running against a throwaway setup
 
