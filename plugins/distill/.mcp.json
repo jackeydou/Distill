@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "distill": {
+      "title": "Distill",
+      "description": "Recall past notes, save distilled notes, search and stats.",
+      "cwd": ".",
+      "command": "./bin/distill-launch",
+      "args": ["mcp"]
+    }
+  }
+}

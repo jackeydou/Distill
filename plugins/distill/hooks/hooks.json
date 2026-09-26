@@ -1,0 +1,16 @@
+{
+  "description": "Tell the agent which session it is in and point it at the distill skill.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${PLUGIN_ROOT}/bin/distill-launch\" hook user-prompt-submit",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

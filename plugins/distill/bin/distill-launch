@@ -1,0 +1,48 @@
+#!/bin/sh
+# Starts the `distill` binary for the plugin's hook and MCP server.
+#
+# Desktop apps often start hooks and MCP servers with a PATH that lacks ~/.cargo/bin or
+# /opt/homebrew/bin, so this looks in order at: $DISTILL_BIN, the path `distill init`
+# recorded in the config, PATH, and common install locations.
+#
+# The hook must never block the user's prompt: when distill is missing, `hook` exits 0.
+
+set -u
+
+config_file() {
+  if [ -n "${DISTILL_HOME:-}" ]; then
+    echo "$DISTILL_HOME/config/config.toml"
+    return
+  fi
+  case "$(uname -s)" in
+    Darwin) echo "$HOME/Library/Application Support/Distill/config.toml" ;;
+    *) echo "${XDG_CONFIG_HOME:-$HOME/.config}/distill/config.toml" ;;
+  esac
+}
+
+bin=""
+try() {
+  if [ -z "$bin" ] && [ -n "$1" ] && [ -x "$1" ]; then
+    bin="$1"
+  fi
+}
+
+try "${DISTILL_BIN:-}"
+config=$(config_file)
+if [ -f "$config" ]; then
+  try "$(sed -n 's/^bin_path = "\(.*\)"$/\1/p' "$config" | head -n 1)"
+fi
+try "$(command -v distill 2>/dev/null || true)"
+for candidate in "$HOME/.cargo/bin/distill" /opt/homebrew/bin/distill /usr/local/bin/distill "$HOME/.local/bin/distill"; do
+  try "$candidate"
+done
+
+if [ -z "$bin" ]; then
+  if [ "${1:-}" = "hook" ]; then
+    exit 0
+  fi
+  echo "distill: binary not found. Install it (see INSTALL.md), run \`distill init\`, or set DISTILL_BIN." >&2
+  exit 127
+fi
+
+exec "$bin" "$@"
