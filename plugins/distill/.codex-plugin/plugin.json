@@ -1,6 +1,6 @@
 {
   "name": "distill",
-  "version": "0.0.1+codex.4ef18ce1dbaf",
+  "version": "0.0.1+codex.86d4fd5a9997",
   "description": "Save what you learn in agent sessions as notes, and notice when you ask the same question again.",
   "author": {
     "name": "Yanlin"
