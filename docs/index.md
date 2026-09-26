@@ -20,5 +20,6 @@ How Distill works today. Why it works this way is in
 | `crates/distill-core` | [README](../crates/distill-core/README.md): vault, index, save/recall/search/stats |
 | `crates/distill-cli` | [README](../crates/distill-cli/README.md): the `distill` command |
 | `plugins/distill` | [README](../plugins/distill/README.md): the agent plugin |
+| `apps/web` | [README](../apps/web/README.md): the web UI |
 
 Touching more than one package: read both READMEs and [vault-format.md](vault-format.md).

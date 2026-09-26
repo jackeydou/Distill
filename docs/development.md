@@ -9,8 +9,15 @@ mise install
 mise run check
 ```
 
-`mise run check` runs `cargo fmt --check`, `cargo clippy -D warnings` and `cargo test` for the
-whole workspace. A change is not done until it passes.
+`mise run check` installs the web dependencies, runs `cargo fmt --check`,
+`cargo clippy -D warnings` and `cargo test` for the whole workspace, then Biome, `tsc`, Vitest
+and a production build for `apps/web`. A change is not done until it passes.
+
+| Task | Does |
+|---|---|
+| `mise run web:build` | Builds `apps/web/dist` |
+| `mise run install` | Builds the web UI, then `cargo install --path crates/distill-cli --locked` |
+| `mise run fmt` | Formats Rust and web code |
 
 ## Layout
 
@@ -19,6 +26,7 @@ whole workspace. A change is not done until it passes.
 | `crates/distill-core` | Library: vault files, SQLite index, operations shared by every front end |
 | `crates/distill-cli` | The `distill` binary |
 | `crates/distill-core/migrations` | Index schema as numbered SQL files |
+| `apps/web` | The web UI ([README](../apps/web/README.md), [web-ui.md](web-ui.md)) |
 | `plugins/distill` | Codex / Claude Code plugin ([plugin.md](plugin.md)) |
 | `packaging/` | Marketplace manifests, one directory per agent |
 | `scripts/` | Build scripts run by `mise` tasks |
@@ -27,7 +35,16 @@ whole workspace. A change is not done until it passes.
 | `spec/` | One directory per decision ([spec/AGENTS.md](../spec/AGENTS.md)) |
 | `.agents/skills/` | Skills for agents working in this repo |
 
-The web UI (`apps/web`) arrives in a later phase.
+A release build (`cargo build --release`, `cargo install`) embeds `apps/web/dist` as it is at
+compile time; build the web UI first. A debug build reads `apps/web/dist` from disk at run time,
+so `pnpm -C apps/web build` is enough to see UI changes.
+
+## API types
+
+Request and response types are Rust. `cargo test` writes their TypeScript versions to
+`apps/web/src/api/generated/` (the export directory is set in `.cargo/config.toml`). Commit the
+regenerated files with the Rust change; CI fails when they differ from what `cargo test`
+produces.
 
 To try the plugin from this checkout, run `mise run build:plugins` and add
 `dist/plugins/claude-code` or `dist/plugins/codex` as a local marketplace, then install
