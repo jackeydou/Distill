@@ -4,6 +4,7 @@
 //! web server), so it runs in WAL mode with a busy timeout, and every sync writes inside
 //! one immediate transaction.
 
+mod browse;
 mod query;
 mod recall;
 mod scan;
@@ -17,6 +18,7 @@ use rusqlite_migration::{M, Migrations};
 
 use crate::error::{IoContext, Result};
 
+pub use browse::{NoteDetail, TopicDetail, TopicRef};
 pub use query::{
     AnnotationView, Conflict, InvalidFile, NoteHit, NoteView, ProjectCount, RecallResult,
     RecallTopic, Stats, TagCount, TopicCount, WeekCount,

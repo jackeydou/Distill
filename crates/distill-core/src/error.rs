@@ -52,6 +52,32 @@ pub enum Error {
     #[error("unknown note {id}.")]
     UnknownNote { id: String },
 
+    #[error("unknown annotation {id}.")]
+    UnknownAnnotation { id: String },
+
+    #[error("invalid topic {id}: {reason}")]
+    InvalidTopic { id: String, reason: String },
+
+    #[error("cannot merge topic {from} into {into}: {reason}")]
+    InvalidMerge {
+        from: String,
+        into: String,
+        reason: String,
+    },
+
+    #[error(
+        "no sync conflict for {kind} {id}. Reload the list; another device may have settled it."
+    )]
+    UnknownConflict { kind: String, id: String },
+
+    #[error("{path} is not one of the conflicting copies of {kind} {id}: {}", .paths.join(", "))]
+    NotAConflictCopy {
+        kind: String,
+        id: String,
+        path: String,
+        paths: Vec<String>,
+    },
+
     #[error("unknown config key \"{key}\". Known keys: {known}.")]
     UnknownConfigKey { key: String, known: String },
 

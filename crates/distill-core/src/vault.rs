@@ -155,6 +155,12 @@ impl Vault {
         Ok(path)
     }
 
+    /// Rewrites a Markdown file this device owns (a topic it renames or merges, an
+    /// annotation it edits) in place.
+    pub fn rewrite_md<T: Serialize>(&self, path: &Path, meta: &T, body: &str) -> Result<()> {
+        write_atomic(path, render_md(path, meta, body)?.as_bytes())
+    }
+
     pub fn write_annotation(&self, meta: &AnnotationMeta, text: &str) -> Result<PathBuf> {
         let path = self.annotation_path(&meta.note, &meta.id);
         write_atomic(&path, render_md(&path, meta, text)?.as_bytes())?;

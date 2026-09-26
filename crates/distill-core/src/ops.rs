@@ -96,6 +96,7 @@ pub fn init(dirs: &Dirs, opts: InitOptions) -> Result<InitReport> {
         ui: existing.as_ref().map_or_else(
             || UiConfig {
                 port: pick_ui_port(),
+                ..UiConfig::default()
             },
             |c| c.ui.clone(),
         ),
