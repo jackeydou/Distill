@@ -1,23 +1,54 @@
 # The agent plugin
 
-`plugins/distill` is one plugin that installs in both Codex and Claude Code. It has three
-parts: a hook that runs on every prompt, an MCP server with four tools, and the `distill` skill
-that tells the agent when to use them. Installing it: [INSTALL.md](../INSTALL.md).
+`plugins/distill` is the source of one plugin that installs in both Codex and Claude Code. It
+has three parts: a hook that runs on every prompt, an MCP server with four tools, and the
+`distill` skill that tells the agent when to use them. Agents install a per-agent build from a
+marketplace branch, not the source directory. Installing it: [INSTALL.md](../INSTALL.md).
 
-## Files
+## Source layout
 
-| File | Read by | Purpose |
+| Path | Goes to | Purpose |
 |---|---|---|
-| `.claude-plugin/plugin.json` | Claude Code | Manifest; declares the MCP server inline |
-| `.codex-plugin/plugin.json` | Codex | Manifest; points at `skills/` and `codex.mcp.json` |
-| `codex.mcp.json` | Codex | MCP server, started from the plugin directory (`cwd: "."`) |
-| `hooks/hooks.json` | both | `UserPromptSubmit` hook. Both agents expand `${CLAUDE_PLUGIN_ROOT}` |
-| `bin/distill-launch` | both | Finds and runs the `distill` binary |
-| `skills/distill/SKILL.md` | both | Every rule the agent follows |
+| `plugins/distill/bin/distill-launch` | both | Finds and runs the `distill` binary |
+| `plugins/distill/skills/distill/` | both | Every rule the agent follows |
+| `plugins/distill/claude-code/` | Claude Code | `.claude-plugin/plugin.json`, `.mcp.json`, `hooks/hooks.json`, using `${CLAUDE_PLUGIN_ROOT}` |
+| `plugins/distill/codex/` | Codex | `.codex-plugin/plugin.json`, `.mcp.json` (started with `cwd: "."`), `hooks/hooks.json`, using `${PLUGIN_ROOT}` |
+| `packaging/claude-code/` | Claude Code | `.claude-plugin/marketplace.json` |
+| `packaging/codex/` | Codex | `.agents/plugins/marketplace.json` |
 
-The marketplaces that list the plugin are `.claude-plugin/marketplace.json` and
-`.agents/plugins/marketplace.json` at the repo root. Both are named `distill`, so the plugin
-id is `distill@distill` in each agent.
+Each agent reads its own native file names, and each build holds one agent's files, so the two
+sets never meet in one directory. Both marketplaces are named `distill`, so the plugin id is
+`distill@distill` in each agent.
+
+## Build and publish
+
+`scripts/build-plugins.sh` (`mise run build:plugins`) writes one marketplace per agent to
+`dist/plugins/<agent>`: the marketplace manifest from `packaging/<agent>/` at the root, and the
+plugin at `plugins/distill` made of `bin/`, `skills/` and the contents of
+`plugins/distill/<agent>/`. Pass `claude-code` or `codex` to build one; `DISTILL_PLUGIN_OUT`
+changes the output root. `--build <id>` sets the output version to `<version>+<agent>.<id>`
+and needs `jq`. The `distill` binary is not included; it ships separately.
+
+On every push to `main`, [CI](../.github/workflows/ci.yml) runs `mise run check`, then builds
+each agent and commits the output to its branch:
+
+| Branch | Holds |
+|---|---|
+| `marketplace-codex` | `dist/plugins/codex` |
+| `marketplace-claude` | `dist/plugins/claude-code` |
+
+The build id is the first 12 characters of the last commit that touched `plugins/distill`,
+`packaging` or the build script. The published version changes only when the plugin does, and
+a push that leaves the plugin unchanged commits nothing.
+
+To try local changes, build and add the output as a local marketplace:
+`claude plugin marketplace add dist/plugins/claude-code` or
+`codex plugin marketplace add dist/plugins/codex`. Codex refuses while a `distill` marketplace
+from another source exists (`codex plugin marketplace remove distill` first); Claude Code
+replaces the old source.
+
+A new file under `plugins/distill` reaches both agents unless it sits in an agent directory.
+`plugin.rs::outputs_hold_only_their_agents_files` checks the outputs against the sources.
 
 ## Finding the binary
 

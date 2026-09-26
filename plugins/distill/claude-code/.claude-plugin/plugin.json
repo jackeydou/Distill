@@ -4,11 +4,5 @@
   "description": "Save what you learn in agent sessions as notes, and notice when you ask the same question again.",
   "author": { "name": "Yanlin" },
   "license": "MIT",
-  "keywords": ["notes", "learning", "recall", "knowledge"],
-  "mcpServers": {
-    "distill": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/bin/distill-launch",
-      "args": ["mcp"]
-    }
-  }
+  "keywords": ["notes", "learning", "recall", "knowledge"]
 }

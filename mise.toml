@@ -1,5 +1,6 @@
 [tools]
 rust = { version = "1.95", components = "rustfmt,clippy" }
+jq = "1.8"
 
 [tasks.fmt]
 description = "Format all Rust code"
@@ -12,3 +13,7 @@ run = [
   "cargo clippy --workspace --all-targets -- -D warnings",
   "cargo test --workspace",
 ]
+
+[tasks."build:plugins"]
+description = "Build per-agent plugin directories under dist/plugins (args: claude-code, codex)"
+run = "scripts/build-plugins.sh"

@@ -39,23 +39,26 @@ distill init --vault "<their folder>"
 
 ## 3. The plugin
 
-Install it in the agent(s) the user works with. Both commands are safe to re-run.
+Install it in the agent(s) the user works with. Each agent has its own marketplace branch
+holding only its build of the plugin. Both commands are safe to re-run.
 
 Codex:
 
 ```bash
-codex plugin marketplace add <source>
+codex plugin marketplace add jackeydou/Distill@marketplace-codex
 codex plugin add distill@distill
 ```
 
 Claude Code:
 
 ```bash
-claude plugin marketplace add <source>
+claude plugin marketplace add jackeydou/Distill@marketplace-claude
 claude plugin install distill@distill
 ```
 
-Codex App and Claude desktop can add the same marketplace from their plugin settings instead.
+Codex App and Claude desktop can add the same marketplace from their plugin settings instead:
+repository `jackeydou/Distill`, ref `marketplace-codex` or `marketplace-claude`. After installing
+in Codex, review and trust the plugin's hook when Codex asks.
 
 ## 4. Check
 

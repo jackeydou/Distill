@@ -272,6 +272,15 @@ plugins/distill/
 > Code 在 `plugin.json` 里内联声明，Codex 用 `codex.mcp.json`。hook 共用 `hooks/hooks.json`：
 > Codex 同样展开 `${CLAUDE_PLUGIN_ROOT}`（见 Codex 二进制内的变量表）。Claude Code 里 skill 的
 > 调用名是 `/distill:distill`。现状见 `docs/plugin.md`。
+>
+> **2026-09-25 实现备注。** 安装改为从 marketplace 分支：CI 在每次 push 到 main 时分别构建
+> Codex 和 Claude Code 版本，提交到 `marketplace-codex`、`marketplace-claude` 两个分支，分支里只有
+> 对应 agent 需要的文件，参照 jackeydou/codex-lang-coach。仓库根目录不再是 marketplace。因为每份
+> 构建只服务一个 agent，两边都改回原生文件名（`.mcp.json`、`hooks/hooks.json`），各用各的变量：
+> Claude Code 用 `${CLAUDE_PLUGIN_ROOT}`，Codex 用 `${PLUGIN_ROOT}`（Codex 也认前者，但只是兼容
+> 别名）。上面 2026-09-19 那条里的 `codex.mcp.json` 和共用 hook 已不再适用。发布的版本号带构建
+> 后缀 `+<agent>.<commit>`，agent 按版本缓存插件，不带后缀就看不到更新；源码里的版本号不变。
+> 现状见 `docs/plugin.md`。
 
 **安装方式：用户自己装，`distill` 不改 agent 的配置**（2026-09-13 讨论确定）。仓库同时提供
 Codex 和 Claude Code 的插件 marketplace，两边都支持从 Git 仓库添加：

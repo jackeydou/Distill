@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+      - uses: Swatinem/rust-cache@v2
+      - run: mise run check
+
+  # Each marketplace branch holds one agent's build and nothing else; see docs/plugin.md.
+  publish-plugin:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - agent: codex
+            branch: marketplace-codex
+          - agent: claude-code
+            branch: marketplace-claude
+    concurrency:
+      group: publish-${{ matrix.branch }}
+      cancel-in-progress: false
+    env:
+      AGENT: ${{ matrix.agent }}
+      BRANCH: ${{ matrix.branch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The build id is the last commit that touched the plugin, so the published version
+      # changes only when the plugin does. jq comes with the runner image.
+      - name: Build
+        run: |
+          id=$(git log -1 --format=%H -- plugins/distill packaging scripts/build-plugins.sh | cut -c1-12)
+          scripts/build-plugins.sh --build "$id" "$AGENT"
+
+      - name: Publish to ${{ matrix.branch }}
+        run: |
+          set -eu
+          pub="$RUNNER_TEMP/publish"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            git fetch --depth=1 origin "$BRANCH"
+            git worktree add --detach "$pub" FETCH_HEAD
+            git -C "$pub" rm -rqf --ignore-unmatch .
+          else
+            git worktree add --orphan -b "$BRANCH" "$pub"
+          fi
+          cp -R "dist/plugins/$AGENT/." "$pub/"
+          git -C "$pub" add -A
+          if git -C "$pub" diff --cached --quiet; then
+            echo "$BRANCH is already up to date."
+            exit 0
+          fi
+          git -C "$pub" commit -qm "Publish Distill plugin for $AGENT from ${GITHUB_SHA:0:12}"
+          git -C "$pub" push origin "HEAD:refs/heads/$BRANCH"

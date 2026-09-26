@@ -8,7 +8,8 @@ Install: [INSTALL.md](../../INSTALL.md). How it works: [docs/plugin.md](../../do
 
 ## Contract
 
-- Plugin id `distill@distill` in both agents.
+- Plugin id `distill@distill` in both agents, installed from the `marketplace-codex` or
+  `marketplace-claude` branch. This directory is the build source and does not install as is.
 - MCP tools: `distill_recall`, `distill_save`, `distill_search`, `distill_stats`.
 - The hook only injects context; it writes nothing and never blocks a prompt.
 - All agent behavior lives in `skills/distill/SKILL.md`. Change behavior there, not in the
