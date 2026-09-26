@@ -1,0 +1,14 @@
+{
+  "name": "distill",
+  "description": "Distill: keep what you learn from agent sessions and notice repeat questions.",
+  "owner": {
+    "name": "Yanlin"
+  },
+  "plugins": [
+    {
+      "name": "distill",
+      "source": "./plugins/distill",
+      "description": "Save what you learn in agent sessions as notes, and notice when you ask the same question again."
+    }
+  ]
+}

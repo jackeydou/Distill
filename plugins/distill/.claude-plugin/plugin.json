@@ -1,0 +1,15 @@
+{
+  "name": "distill",
+  "version": "0.0.1+claude-code.4ef18ce1dbaf",
+  "description": "Save what you learn in agent sessions as notes, and notice when you ask the same question again.",
+  "author": {
+    "name": "Yanlin"
+  },
+  "license": "MIT",
+  "keywords": [
+    "notes",
+    "learning",
+    "recall",
+    "knowledge"
+  ]
+}
