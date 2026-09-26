@@ -1,20 +1,19 @@
 //! Embedding-backed reads: recall that finds reworded questions keyword matching misses,
 //! and topic pairs that are probably the same question (merge suggestions, spec P4).
 //!
-//! Vectors live in the index next to everything else and are compared in memory: a
-//! personal vault has thousands of notes, which a linear scan over 384-dimension vectors
-//! handles in milliseconds. `sqlite-vec` is not used; loading an extension needs `unsafe`,
-//! which this workspace forbids.
+//! Vectors live in sqlite-vec `vec0` tables in the index (`0002_embeddings.sql`), and every
+//! nearest-neighbour search is a `vec0` KNN query with cosine distance. Topic vectors are the
+//! mean of their notes' vectors and are rebuilt only when the notes or topics change.
 
 use std::collections::{HashMap, HashSet};
 
-use rusqlite::params;
+use rusqlite::{OptionalExtension, params};
 use serde::Serialize;
 
 use super::Index;
 use super::browse::TopicRef;
 use super::query::{RecallResult, Row};
-use crate::embed::{Embedder, MODEL_KEY, centroid, cosine, from_blob, note_text, to_blob};
+use crate::embed::{Embedder, MODEL_KEY, centroid, from_blob, note_text, to_blob};
 use crate::error::Result;
 use crate::fsutil::content_hash;
 
@@ -26,8 +25,10 @@ const RECALL_MIN: f32 = 0.4;
 /// Topic pairs at or above this are suggested for merging. Above every different-question
 /// pair measured; the user confirms each merge or dismisses the pair.
 pub const DUPLICATE_MIN: f32 = 0.65;
-/// How many semantic hits take part in fusion.
+/// How many nearest notes take part in fusion.
 const SEMANTIC_CANDIDATES: usize = 30;
+/// Nearest topics checked per topic when looking for duplicates.
+const DUPLICATE_NEIGHBOURS: usize = 5;
 
 #[derive(Debug, Clone, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -49,40 +50,40 @@ pub struct SimilarTopic {
 }
 
 impl Index {
-    /// Computes vectors for notes that have none under the current model, and drops
-    /// vectors no note uses any more. Returns how many notes were embedded.
+    /// Computes vectors for notes that have none under the current model, drops vectors no
+    /// note uses any more, and refreshes topic vectors when anything changed. Returns how
+    /// many notes were embedded.
     pub fn embed_missing(&self, embedder: &Embedder) -> Result<usize> {
         let rows = self.rows()?;
         let known: HashSet<String> = {
-            let mut stmt = self
-                .conn
-                .prepare("SELECT text_hash FROM embedding WHERE model = ?1")?;
-            let hashes = stmt.query_map([MODEL_KEY], |r| r.get(0))?;
-            hashes.collect::<rusqlite::Result<_>>()?
+            let mut stmt = self.conn.prepare("SELECT key FROM note_vec")?;
+            let keys = stmt.query_map([], |r| r.get(0))?;
+            keys.collect::<rusqlite::Result<_>>()?
         };
-        let mut wanted: HashMap<String, String> = HashMap::new();
-        for row in &rows {
-            let text = note_text(&row.title, &row.question);
-            wanted.insert(content_hash(text.as_bytes()), text);
-        }
+        let wanted: HashMap<String, String> = rows
+            .iter()
+            .map(|r| (note_key(r), note_text(&r.title, &r.question)))
+            .collect();
         let missing: Vec<(&String, &String)> =
-            wanted.iter().filter(|(h, _)| !known.contains(*h)).collect();
-        if !missing.is_empty() {
+            wanted.iter().filter(|(k, _)| !known.contains(*k)).collect();
+        let vectors = if missing.is_empty() {
+            Vec::new()
+        } else {
             let texts: Vec<String> = missing.iter().map(|(_, t)| (*t).clone()).collect();
-            let vectors = embedder.embed(&texts)?;
-            for ((hash, _), vector) in missing.iter().zip(vectors) {
-                self.conn.execute(
-                    "INSERT OR REPLACE INTO embedding (model, text_hash, vector) VALUES (?1, ?2, ?3)",
-                    params![MODEL_KEY, hash, to_blob(&vector)],
-                )?;
-            }
-        }
-        for stale in known.iter().filter(|h| !wanted.contains_key(*h)) {
-            self.conn.execute(
-                "DELETE FROM embedding WHERE model = ?1 AND text_hash = ?2",
-                params![MODEL_KEY, stale],
+            embedder.embed(&texts)?
+        };
+        let tx = self.conn.unchecked_transaction()?;
+        for ((key, _), vector) in missing.iter().zip(&vectors) {
+            tx.execute(
+                "INSERT INTO note_vec (key, vector) VALUES (?1, ?2)",
+                params![key, to_blob(vector)],
             )?;
         }
+        for stale in known.iter().filter(|k| !wanted.contains_key(*k)) {
+            tx.execute("DELETE FROM note_vec WHERE key = ?1", [stale])?;
+        }
+        tx.commit()?;
+        self.refresh_topic_vectors(&rows)?;
         Ok(missing.len())
     }
 
@@ -94,18 +95,27 @@ impl Index {
         embedder: &Embedder,
     ) -> Result<RecallResult> {
         self.embed_missing(embedder)?;
-        let query = embedder.embed_one(question)?;
-        let vectors = self.note_vectors()?;
-        let mut scored: Vec<(f32, &String)> = vectors
+        let query = to_blob(&embedder.embed_one(question)?);
+        let mut stmt = self.conn.prepare(
+            "SELECT key, distance FROM note_vec WHERE vector MATCH ?1 AND k = ?2
+             ORDER BY distance",
+        )?;
+        let hits = stmt.query_map(params![query, SEMANTIC_CANDIDATES as i64], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, f64>(1)?))
+        })?;
+        let mut keys: Vec<String> = Vec::new();
+        for hit in hits {
+            let (key, distance) = hit?;
+            if similarity(distance) >= RECALL_MIN {
+                keys.push(key);
+            }
+        }
+        // Several notes can share one key when their title and question are identical.
+        let rows = self.rows()?;
+        let semantic: Vec<String> = keys
             .iter()
-            .map(|(id, v)| (cosine(&query, v), id))
-            .filter(|(s, _)| *s >= RECALL_MIN)
-            .collect();
-        scored.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(b.1)));
-        let semantic: Vec<String> = scored
-            .into_iter()
-            .take(SEMANTIC_CANDIDATES)
-            .map(|(_, id)| id.clone())
+            .flat_map(|key| rows.iter().filter(move |r| note_key(r) == *key))
+            .map(|r| r.id.clone())
             .collect();
         self.recall_with(question, limit, Some(&semantic))
     }
@@ -114,27 +124,35 @@ impl Index {
     /// dismissed are left out.
     pub fn duplicate_topics(&self, embedder: &Embedder) -> Result<Vec<TopicPair>> {
         self.embed_missing(embedder)?;
-        let topics = self.topic_vectors()?;
+        let topics = self.topic_info()?;
         let dismissed = self.dismissed()?;
+        let mut seen: HashSet<(String, String)> = HashSet::new();
         let mut pairs = Vec::new();
-        for (i, a) in topics.iter().enumerate() {
-            for b in &topics[i + 1..] {
-                let similarity = cosine(&a.vector, &b.vector);
-                if similarity < DUPLICATE_MIN || dismissed.contains(&ordered(&a.id, &b.id)) {
+        for id in topics.keys() {
+            for (other, similarity) in self.nearest_topics(id, DUPLICATE_NEIGHBOURS)? {
+                let key = ordered(id, &other);
+                if similarity < DUPLICATE_MIN || dismissed.contains(&key) || !seen.insert(key) {
                     continue;
                 }
+                let (Some(a), Some(b)) = (topics.get(id), topics.get(&other)) else {
+                    continue;
+                };
                 // The more-asked topic is `b`, the natural merge target.
                 let (a, b) = if a.count > b.count { (b, a) } else { (a, b) };
                 pairs.push(TopicPair {
-                    a: a.topic_ref(),
-                    b: b.topic_ref(),
+                    a: a.topic.clone(),
+                    b: b.topic.clone(),
                     similarity,
                     a_count: a.count,
                     b_count: b.count,
                 });
             }
         }
-        pairs.sort_by(|x, y| y.similarity.total_cmp(&x.similarity));
+        pairs.sort_by(|x, y| {
+            y.similarity
+                .total_cmp(&x.similarity)
+                .then(x.a.topic_id.cmp(&y.a.topic_id))
+        });
         Ok(pairs)
     }
 
@@ -147,23 +165,20 @@ impl Index {
     ) -> Result<Vec<SimilarTopic>> {
         self.embed_missing(embedder)?;
         let topic_id = self.resolve_topic(topic_id)?;
-        let topics = self.topic_vectors()?;
-        let Some(me) = topics.iter().find(|t| t.id == topic_id) else {
-            return Ok(Vec::new());
-        };
-        let mut out: Vec<SimilarTopic> = topics
-            .iter()
-            .filter(|t| t.id != topic_id)
-            .map(|t| SimilarTopic {
-                similarity: cosine(&me.vector, &t.vector),
-                ask_count: t.count,
-                topic: t.topic_ref(),
+        let topics = self.topic_info()?;
+        Ok(self
+            .nearest_topics(&topic_id, limit)?
+            .into_iter()
+            .filter(|(_, similarity)| *similarity >= RECALL_MIN)
+            .filter_map(|(id, similarity)| {
+                let info = topics.get(&id)?;
+                Some(SimilarTopic {
+                    topic: info.topic.clone(),
+                    similarity,
+                    ask_count: info.count,
+                })
             })
-            .filter(|s| s.similarity >= RECALL_MIN)
-            .collect();
-        out.sort_by(|x, y| y.similarity.total_cmp(&x.similarity));
-        out.truncate(limit);
-        Ok(out)
+            .collect())
     }
 
     /// Records that two topics are not the same question.
@@ -176,6 +191,95 @@ impl Index {
         Ok(())
     }
 
+    /// The `limit` topics nearest to `topic_id` by a `vec0` KNN query, with their cosine
+    /// similarity. Empty when the topic has no vector.
+    fn nearest_topics(&self, topic_id: &str, limit: usize) -> Result<Vec<(String, f32)>> {
+        let vector: Option<Vec<u8>> = self
+            .conn
+            .query_row(
+                "SELECT vector FROM topic_vec WHERE topic_id = ?1",
+                [topic_id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let Some(vector) = vector else {
+            return Ok(Vec::new());
+        };
+        let mut stmt = self.conn.prepare(
+            "SELECT topic_id, distance FROM topic_vec WHERE vector MATCH ?1 AND k = ?2
+             ORDER BY distance",
+        )?;
+        let hits = stmt.query_map(params![vector, (limit + 1) as i64], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, f64>(1)?))
+        })?;
+        let mut out = Vec::new();
+        for hit in hits {
+            let (id, distance) = hit?;
+            if id != topic_id {
+                out.push((id, similarity(distance)));
+            }
+        }
+        out.truncate(limit);
+        Ok(out)
+    }
+
+    /// Rewrites `topic_vec` when the topics or their notes' vectors changed since the last
+    /// time. The check is one hash over every (topic, note key) pair.
+    fn refresh_topic_vectors(&self, rows: &[Row]) -> Result<()> {
+        let mut members: Vec<(&str, String)> = rows
+            .iter()
+            .map(|r| (r.topic_id.as_str(), note_key(r)))
+            .collect();
+        members.sort();
+        let signature = content_hash(
+            members
+                .iter()
+                .map(|(t, k)| format!("{t} {k}\n"))
+                .collect::<String>()
+                .as_bytes(),
+        );
+        let stored: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT value FROM vec_state WHERE name = 'topic_vec'",
+                [],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if stored.as_deref() == Some(signature.as_str()) {
+            return Ok(());
+        }
+        let vectors: HashMap<String, Vec<f32>> = {
+            let mut stmt = self.conn.prepare("SELECT key, vector FROM note_vec")?;
+            let rows = stmt.query_map([], |r| {
+                Ok((r.get::<_, String>(0)?, from_blob(&r.get::<_, Vec<u8>>(1)?)))
+            })?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        let mut by_topic: HashMap<&str, Vec<&[f32]>> = HashMap::new();
+        for (topic, key) in &members {
+            if let Some(v) = vectors.get(key) {
+                by_topic.entry(topic).or_default().push(v);
+            }
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM topic_vec", [])?;
+        for (topic, vs) in by_topic {
+            if let Some(mean) = centroid(vs) {
+                tx.execute(
+                    "INSERT INTO topic_vec (topic_id, vector) VALUES (?1, ?2)",
+                    params![topic, to_blob(&mean)],
+                )?;
+            }
+        }
+        tx.execute(
+            "INSERT OR REPLACE INTO vec_state (name, value) VALUES ('topic_vec', ?1)",
+            [signature],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
     fn dismissed(&self) -> Result<HashSet<(String, String)>> {
         let mut stmt = self
             .conn
@@ -184,74 +288,41 @@ impl Index {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// Note id to vector, for every note that has one.
-    fn note_vectors(&self) -> Result<HashMap<String, Vec<f32>>> {
-        let by_hash = self.vectors_by_hash()?;
-        Ok(self
-            .rows()?
-            .into_iter()
-            .filter_map(|r| {
-                let hash = content_hash(note_text(&r.title, &r.question).as_bytes());
-                by_hash.get(&hash).map(|v| (r.id, v.clone()))
-            })
-            .collect())
-    }
-
-    fn vectors_by_hash(&self) -> Result<HashMap<String, Vec<f32>>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT text_hash, vector FROM embedding WHERE model = ?1")?;
-        let rows = stmt.query_map([MODEL_KEY], |r| {
-            Ok((r.get::<_, String>(0)?, from_blob(&r.get::<_, Vec<u8>>(1)?)))
-        })?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
-    }
-
-    fn topic_vectors(&self) -> Result<Vec<TopicVector>> {
-        let by_hash = self.vectors_by_hash()?;
+    /// Label and note count of every topic that has notes.
+    fn topic_info(&self) -> Result<HashMap<String, TopicInfo>> {
         let labels = self.topic_labels()?;
-        let mut notes: HashMap<String, Vec<&Row>> = HashMap::new();
-        let rows = self.rows()?;
-        for row in &rows {
-            notes.entry(row.topic_id.clone()).or_default().push(row);
-        }
-        let mut out: Vec<TopicVector> = notes
-            .into_iter()
-            .filter_map(|(id, rows)| {
-                let vectors: Vec<&Vec<f32>> = rows
-                    .iter()
-                    .filter_map(|r| {
-                        by_hash.get(&content_hash(note_text(&r.title, &r.question).as_bytes()))
-                    })
-                    .collect();
-                let vector = centroid(vectors.iter().map(|v| v.as_slice()))?;
-                Some(TopicVector {
-                    label: labels.get(&id).cloned().unwrap_or_default(),
-                    count: rows.len(),
-                    id,
-                    vector,
+        let mut out: HashMap<String, TopicInfo> = HashMap::new();
+        for row in self.rows()? {
+            out.entry(row.topic_id.clone())
+                .or_insert_with(|| TopicInfo {
+                    topic: TopicRef {
+                        label: labels.get(&row.topic_id).cloned().unwrap_or_default(),
+                        topic_id: row.topic_id.clone(),
+                    },
+                    count: 0,
                 })
-            })
-            .collect();
-        out.sort_by(|a, b| a.id.cmp(&b.id));
+                .count += 1;
+        }
         Ok(out)
     }
 }
 
-struct TopicVector {
-    id: String,
-    label: String,
+struct TopicInfo {
+    topic: TopicRef,
     count: usize,
-    vector: Vec<f32>,
 }
 
-impl TopicVector {
-    fn topic_ref(&self) -> TopicRef {
-        TopicRef {
-            topic_id: self.id.clone(),
-            label: self.label.clone(),
-        }
-    }
+/// `vec0` cosine distance is `1 - cosine similarity`.
+fn similarity(distance: f64) -> f32 {
+    (1.0 - distance) as f32
+}
+
+/// What a note's vector is stored under: the model and the hash of the embedded text.
+fn note_key(row: &Row) -> String {
+    format!(
+        "{MODEL_KEY}:{}",
+        content_hash(note_text(&row.title, &row.question).as_bytes())
+    )
 }
 
 fn ordered(a: &str, b: &str) -> (String, String) {
@@ -259,5 +330,49 @@ fn ordered(a: &str, b: &str) -> (String, String) {
         (a.to_string(), b.to_string())
     } else {
         (b.to_string(), a.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+
+    fn unit(v: &[f32]) -> Vec<f32> {
+        let mut v = v.to_vec();
+        v.resize(384, 0.0);
+        let norm = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+        v.iter().map(|x| x / norm).collect()
+    }
+
+    #[test]
+    fn nearest_topics_is_a_vec0_knn_query() {
+        let dir = tempfile::tempdir().unwrap();
+        let index = Index::open(&dir.path().join("index.db"), dir.path()).unwrap();
+        let version: String = index
+            .conn
+            .query_row("SELECT vec_version()", [], |r| r.get(0))
+            .unwrap();
+        assert!(version.starts_with('v'), "{version}");
+        for (id, v) in [
+            ("A", unit(&[1.0, 0.0])),
+            ("B", unit(&[0.9, 0.1])),
+            ("C", unit(&[0.0, 1.0])),
+        ] {
+            index
+                .conn
+                .execute(
+                    "INSERT INTO topic_vec (topic_id, vector) VALUES (?1, ?2)",
+                    params![id, to_blob(&v)],
+                )
+                .unwrap();
+        }
+        let near = index.nearest_topics("A", 2).unwrap();
+        assert_eq!(near[0].0, "B");
+        assert!(near[0].1 > 0.99, "{near:?}");
+        assert_eq!(near[1].0, "C");
+        assert!(near[1].1.abs() < 1e-3, "{near:?}");
+        assert!(index.nearest_topics("missing", 2).unwrap().is_empty());
     }
 }

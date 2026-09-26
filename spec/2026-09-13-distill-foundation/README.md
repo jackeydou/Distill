@@ -238,9 +238,9 @@ agent 判断是不是同一个问题。它本来就是 LLM，判断语义等价�
 > 量化版 `paraphrase-multilingual-MiniLM-L12-v2`（384 维，磁盘约 0.25 GB），这个模型专门训练过
 > 同义句匹配，中英文都能用（2026-09-26 讨论确定，放弃了 candle + multilingual-e5-small 和调用本机
 > Ollama）。模型不自动下载，`distill model pull` 显式拉取；没拉取时 recall 保持关键词打分。
-> 向量没有用 `sqlite-vec`：加载扩展要写 `unsafe`，而工作区 `unsafe_code = "forbid"`；改为在索引的
-> `embedding` 表里存 BLOB、内存里算余弦，几千条 note 在毫秒级。表按「模型 + 文本 hash」做主键，
-> `reindex` 不清它，重建索引不用重跑模型。融合用 RRF（k = 60）。阈值是实测出来的：12 对中英文问题里，
+> 向量按原计划放 `sqlite-vec` 的 `vec0` 表、用 KNN 查询。注册扩展要一段 `unsafe`，工作区的
+> `unsafe_code` 从 `forbid` 改为 `deny`，只有 `index/vec.rs` 例外。note 向量按「模型 + 文本 hash」
+> 做主键，`reindex` 不清它；topic 向量是 note 向量的均值，另存一张 `vec0` 表。融合用 RRF（k = 60）。阈值是实测出来的：12 对中英文问题里，
 > 同一问题换说法得 0.40–0.74，不同问题最高 0.54，两段重叠，所以 recall 的下限定在 0.40、交给 agent
 > 判断，合并建议的下限定在 0.65、交给用户确认。现状见 `docs/recall.md`。
 

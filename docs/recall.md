@@ -9,7 +9,7 @@ candidate topics; the agent decides whether one is the same question.
 | Ranking | Always on | How | Code |
 |---|---|---|---|
 | Keyword | Yes | Every note scored on CJK bigrams and words, IDF-weighted, title and question counted double; notes covering less than 25% of the question's weight are dropped | `crates/distill-core/src/index/recall.rs` |
-| Semantic | After `distill model pull` | Cosine similarity between the question and each note's `title + question` vector; notes below 0.40 are dropped, the top 30 kept | `crates/distill-core/src/index/semantic.rs` |
+| Semantic | After `distill model pull` | A sqlite-vec KNN query (cosine distance) for the 30 notes whose `title + question` vectors are nearest the question's; notes below 0.40 similarity are dropped | `crates/distill-core/src/index/semantic.rs` |
 
 With the model installed the two lists are merged by reciprocal rank fusion
 (`1 / (60 + rank)` summed per note), so a note either ranking finds is a candidate and one
@@ -36,17 +36,30 @@ keeps it; the MCP server and web server reuse it across calls.
 
 ## Vectors
 
-Vectors live in the index table `embedding`, keyed by model and by the BLAKE3 hash of the
-embedded text. Notes that lack a vector are embedded on the next recall or duplicate check;
-vectors whose text no longer appears in the vault are deleted then. `distill reindex` leaves
-the table alone, so a rebuild does not re-run the model. They are compared in memory, not
-with `sqlite-vec`.
+Vectors live in two sqlite-vec `vec0` tables in the index, both with cosine distance
+(`crates/distill-core/migrations/0002_embeddings.sql`):
+
+| Table | Key | Holds |
+|---|---|---|
+| `note_vec` | `<model>:<BLAKE3 of the embedded text>` | One vector per distinct note text |
+| `topic_vec` | topic id (after merges) | The normalized mean of the topic's note vectors |
+
+Notes that lack a vector are embedded on the next recall or duplicate check; keys no note uses
+any more are deleted then. `topic_vec` is rewritten only when the set of (topic, note key)
+pairs changes, which a hash in `vec_state` detects. `distill reindex` leaves these tables
+alone, so a rebuild does not re-run the model.
+
+sqlite-vec is compiled into `distill` (the `sqlite-vec` crate) and registered with SQLite as
+an auto-extension before the index opens (`crates/distill-core/src/index/vec.rs`). That
+registration is the workspace's only `unsafe` code; the lint is `deny`, and that module opts
+out.
 
 ## Duplicate topics
 
-A topic's vector is the normalized mean of its notes' vectors. Topic pairs at 0.65 or above
-are offered as probably the same question: on the web UI's Topics page ("可能重复"), as a
-banner on the home page, and as "相似的 topic" on a topic page (0.40 and above, top 5).
+Each topic's five nearest topics come from a KNN query on `topic_vec`. Pairs at 0.65
+similarity or above are offered as probably the same question: on the web UI's Topics page
+("可能重复"), as a banner on the home page, and as "相似的 topic" on a topic page (0.40 and
+above, top 5).
 Merging writes `merged_into` as described in [vault-format.md](vault-format.md#topic).
 "不是同一个问题" records the pair in the index table `dismissed_pair`, on this device only.
 

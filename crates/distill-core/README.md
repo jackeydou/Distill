@@ -51,8 +51,8 @@ are rejected.
 
 ## Limits
 
-- Recall scores every note in memory: CJK bigrams and words weighted by IDF, plus cosine
-  similarity of 384-dimension vectors when the model is installed. It is meant for a personal
+- Recall scores every note in memory on CJK bigrams and words weighted by IDF, plus a
+  sqlite-vec KNN query over 384-dimension vectors when the model is installed. It is meant for a personal
   vault of thousands of notes.
 - The embedding model is downloaded only by `Embedder::pull` (about 0.25 GB into
   `<data dir>/models`). Building this crate downloads ONNX Runtime (fastembed's prebuilt

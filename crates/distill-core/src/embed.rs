@@ -123,11 +123,6 @@ fn normalized(mut v: Vec<f32>) -> Vec<f32> {
     v
 }
 
-/// Cosine similarity of two unit-length vectors.
-pub fn cosine(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b).map(|(x, y)| x * y).sum()
-}
-
 /// The mean direction of several unit vectors, itself unit length.
 pub fn centroid<'a>(vectors: impl IntoIterator<Item = &'a [f32]>) -> Option<Vec<f32>> {
     let mut sum: Option<Vec<f32>> = None;
@@ -165,9 +160,8 @@ mod tests {
     fn vectors_round_trip_and_compare() {
         let a = normalized(vec![3.0, 4.0]);
         assert_eq!(from_blob(&to_blob(&a)), a);
-        assert!((cosine(&a, &a) - 1.0).abs() < 1e-6);
         let c = centroid([[1.0, 0.0].as_slice(), [0.0, 1.0].as_slice()]).unwrap_or_default();
         assert!((c[0] - c[1]).abs() < 1e-6);
-        assert!((cosine(&c, &c) - 1.0).abs() < 1e-6);
+        assert!((c.iter().map(|x| x * x).sum::<f32>() - 1.0).abs() < 1e-6);
     }
 }

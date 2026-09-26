@@ -9,6 +9,7 @@ mod query;
 mod recall;
 mod scan;
 mod semantic;
+mod vec;
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -44,6 +45,7 @@ impl Index {
         if let Some(dir) = db_path.parent() {
             std::fs::create_dir_all(dir).at(dir)?;
         }
+        vec::register()?;
         let mut conn = Connection::open(db_path)?;
         conn.busy_timeout(Duration::from_secs(5))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;

@@ -100,6 +100,9 @@ pub enum Error {
         source: fastembed::Error,
     },
 
+    #[error("could not register the sqlite-vec extension: {reason}")]
+    VectorExtension { reason: String },
+
     #[error("I/O error at {path}")]
     Io {
         path: PathBuf,
