@@ -10,3 +10,8 @@
 - `distill mcp`: stdio MCP server with `distill_recall`, `distill_save`, `distill_search` and
   `distill_stats`.
 - `distill hook user-prompt-submit`: prints the context the plugin injects on every prompt.
+- `distill ui`: local web UI server at `http://distill.localhost:<ui.port>` with a session
+  cookie from a one-time link, loopback-only listening, Host and Origin checks, a JSON API and
+  server-sent change events. `distill ui stop` stops it. See `docs/web-ui.md`.
+- `distill mcp` starts the web UI in the background before returning note links, unless
+  `ui.autostart` is `false`. `distill_recall` and `distill_search` notes now carry `url`.

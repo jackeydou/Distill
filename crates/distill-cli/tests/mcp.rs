@@ -31,6 +31,18 @@ impl Env {
             .status()
             .unwrap();
         assert!(status.success());
+        // A port of its own: saving starts the web UI in the background.
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        let status = env
+            .command(&["config", "set", "ui.port", &port.to_string()])
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success());
         env
     }
 
@@ -44,6 +56,16 @@ impl Env {
             .env_remove("CLAUDECODE")
             .args(args);
         cmd
+    }
+}
+
+impl Drop for Env {
+    fn drop(&mut self) {
+        let _ = self
+            .command(&["ui", "stop"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
     }
 }
 
@@ -172,6 +194,24 @@ fn save_then_recall_reports_repeats_and_reopen_links() {
     let (err, first) = mcp.call("distill_save", save_args("new", SESSION));
     assert!(!err, "{first}");
     assert_eq!(first["ask_count"], 1);
+    assert_eq!(
+        first["warnings"],
+        json!([]),
+        "the web UI should have started"
+    );
+    let url = first["url"].as_str().unwrap();
+    let port = url.rsplit_once(':').unwrap().1.split('/').next().unwrap();
+    let mut health = String::new();
+    std::io::Read::read_to_string(
+        &mut ureq::get(format!("http://127.0.0.1:{port}/api/health"))
+            .call()
+            .unwrap()
+            .into_body()
+            .into_reader(),
+        &mut health,
+    )
+    .unwrap();
+    assert!(health.contains("\"app\":\"distill\""), "{health}");
 
     let (_, recall) = mcp.call("distill_recall", json!({ "question": "bun 加载扩展失败" }));
     let topic = &recall["topics"][0];
@@ -180,6 +220,7 @@ fn save_then_recall_reports_repeats_and_reopen_links() {
     let note = &topic["notes"][0];
     assert_eq!(note["reopen"]["link"], format!("codex://threads/{SESSION}"));
     assert!(std::path::Path::new(note["file"].as_str().unwrap()).is_file());
+    assert_eq!(note["url"], url);
 
     let mut again = save_args(first["topic_id"].as_str().unwrap(), SESSION);
     again["new_tags"] = json!([]);

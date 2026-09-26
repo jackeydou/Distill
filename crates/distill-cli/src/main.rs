@@ -1,6 +1,7 @@
 mod hook;
 mod mcp;
 mod render;
+mod ui;
 
 use std::io::{IsTerminal, Read, Write};
 use std::path::PathBuf;
@@ -84,11 +85,35 @@ enum Command {
     Config(ConfigCommand),
     /// Check the vault, index and setup, and list what needs attention.
     Doctor,
+    /// Open the web UI in a browser, starting its local server if needed.
+    Ui(UiArgs),
     /// Run the MCP server on stdio. Started by the Distill plugin, one per agent session.
     Mcp,
     /// Hook entry points. Run by the Distill plugin; always exit 0.
     #[command(subcommand)]
     Hook(HookEvent),
+}
+
+#[derive(clap::Args)]
+#[command(args_conflicts_with_subcommands = true)]
+struct UiArgs {
+    #[command(subcommand)]
+    command: Option<UiCommand>,
+    /// Serve on this port instead of `ui.port`. Links agents hand out use `ui.port`.
+    #[arg(long)]
+    port: Option<u16>,
+    /// Print the authorization link instead of opening a browser.
+    #[arg(long)]
+    no_open: bool,
+    /// Serve without a terminal. Used when `distill mcp` starts the server.
+    #[arg(long, hide = true)]
+    background: bool,
+}
+
+#[derive(Subcommand)]
+enum UiCommand {
+    /// Stop the running web UI server.
+    Stop,
 }
 
 #[derive(Subcommand)]
@@ -187,6 +212,23 @@ fn run(cli: Cli) -> Result<()> {
         }
         Command::Vault(cmd) => vault(cmd, json),
         Command::Config(cmd) => config(cmd, json),
+        Command::Ui(args) => match args.command {
+            Some(UiCommand::Stop) => {
+                let stopped = ui::stop()?;
+                emit(json, &serde_json::json!({ "stopped": stopped }), |_| {
+                    if stopped {
+                        "Stopped the Distill web UI.".into()
+                    } else {
+                        "The Distill web UI was not running.".into()
+                    }
+                })
+            }
+            None => ui::run(ui::Options {
+                port: args.port,
+                background: args.background,
+                open_browser: !args.no_open,
+            }),
+        },
         Command::Mcp => tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?

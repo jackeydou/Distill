@@ -10,6 +10,7 @@ How Distill works today. Why it works this way is in
 | [development.md](development.md) | Toolchain, repo layout, `mise run check`, testing with a throwaway setup |
 | [vault-format.md](vault-format.md) | Vault layout and every file format in it; how the index is derived |
 | [plugin.md](plugin.md) | The Codex / Claude Code plugin: hook, MCP tools, skill, launcher |
+| [web-ui.md](web-ui.md) | `distill ui`: address, background start, security, the JSON API |
 | [AGENTS.md](AGENTS.md) | Writing rules for every Markdown file |
 
 ## Packages

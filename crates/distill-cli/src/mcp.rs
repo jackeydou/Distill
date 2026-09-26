@@ -70,6 +70,11 @@ impl DistillServer {
         respond(|| {
             let d = Distill::open()?;
             let result = d.index.recall(&p.question, p.limit.unwrap_or(5))?;
+            let warnings = if result.topics.is_empty() {
+                Vec::new()
+            } else {
+                start_ui(&d)
+            };
             let topics: Vec<Value> = result
                 .topics
                 .iter()
@@ -82,7 +87,7 @@ impl DistillServer {
                     })
                 })
                 .collect();
-            Ok(json!({ "topics": topics, "tags": result.tags }))
+            Ok(json!({ "topics": topics, "tags": result.tags, "warnings": warnings }))
         })
     }
 
@@ -99,7 +104,10 @@ impl DistillServer {
             for w in &warnings {
                 eprintln!("distill: {w}");
             }
-            let saved = Distill::open()?.save(req)?;
+            let mut warnings = warnings;
+            let mut d = Distill::open()?;
+            let saved = d.save(req)?;
+            warnings.extend(start_ui(&d));
             let mut out = serde_json::to_value(&saved).map_err(json_error)?;
             out["file"] = json!(saved.path);
             out["warnings"] = json!(warnings);
@@ -127,6 +135,7 @@ impl DistillServer {
                 .map(|h| {
                     let mut v = serde_json::to_value(h).map_err(json_error)?;
                     v["file"] = json!(abs(&d, &h.path));
+                    v["url"] = json!(d.config.note_url(&h.id));
                     Ok(v)
                 })
                 .collect::<distill_core::Result<Vec<Value>>>()?;
@@ -167,9 +176,26 @@ pub async fn serve() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Starts the web UI so the links in a tool result open. A failure does not fail the tool
+/// call; it comes back as a warning the agent can pass on.
+fn start_ui(d: &Distill) -> Vec<String> {
+    if !d.config.ui.autostart {
+        return Vec::new();
+    }
+    match crate::ui::ensure_running(&d.config, &d.dirs) {
+        Ok(_) => Vec::new(),
+        Err(e) => {
+            let warning = format!("note links may not open: {e:#}");
+            eprintln!("distill: {warning}");
+            vec![warning]
+        }
+    }
+}
+
 fn note_json(d: &Distill, n: &NoteView) -> Value {
     json!({
         "id": n.id,
+        "url": d.config.note_url(&n.id),
         "title": n.title,
         "question": n.question,
         "conclusion": n.conclusion,

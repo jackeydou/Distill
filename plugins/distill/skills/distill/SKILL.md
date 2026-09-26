@@ -36,7 +36,8 @@ question:
 - Build on the earlier conclusion and on the user's annotations (their own understanding).
   Address what the earlier note listed as still unclear.
 - Tell the user in one line, for example: "You asked this before (3 times); last note: <title>
-  (<file>)." `reopen.link` reopens the old session; `reopen.command` does it from a terminal.
+  (<url>)." `url` opens the note in the Distill web UI; `reopen.link` reopens the old
+  session; `reopen.command` does it from a terminal.
 
 When nothing is relevant, say nothing about Distill.
 
@@ -63,7 +64,7 @@ When the user agrees, or asks to distill:
    Follow the style of the existing tags.
 4. Write the note in the user's language. See [references/note-format.md](references/note-format.md).
 5. Call `distill_save` with `source` copied from the `distill-source` line.
-6. Tell the user in one or two lines: saved, the title, the file path, and when `ask_count` is
+6. Tell the user in one or two lines: saved, the title, the `url`, and when `ask_count` is
    above 1, that this is the Nth time they asked.
 
 When `distill_save` returns an error:
@@ -81,7 +82,11 @@ When `distill_save` returns an error:
 For questions like "what do I keep asking about?" or "which topics haven't I understood?":
 call `distill_stats` for counts, then `distill_search` or `distill_recall` to read notes.
 Topics asked two or more times without an annotation are the ones the user most likely has not
-digested yet; say so. Users add annotations with `distill annotate <note-id> <text>`.
+digested yet; say so. Users add annotations on a note's page (its `url`), or with
+`distill annotate <note-id> <text>`.
+
+If a result has `warnings`, mention them in one line; the links in it may not open until the
+user runs `distill ui`.
 
 ## Terms
 

@@ -84,9 +84,9 @@ run `distill init`.
 
 | Tool | Returns |
 |---|---|
-| `distill_recall` | Matching topics with `ask_count`, their notes (with `file`, annotations and `reopen`), and every tag in use |
-| `distill_save` | The save result (`note_id`, `topic_id`, `ask_count`, `tags`, `file`) plus `warnings` |
-| `distill_search` | Notes matching keywords and/or a tag, with `file` |
+| `distill_recall` | Matching topics with `ask_count`, their notes (with `url`, `file`, annotations and `reopen`), every tag in use, and `warnings` |
+| `distill_save` | The save result (`note_id`, `topic_id`, `ask_count`, `tags`, `url`, `file`) plus `warnings` |
+| `distill_search` | Notes matching keywords and/or a tag, with `url` and `file` |
 | `distill_stats` | The same counts as `distill stats --json` |
 
 A failed validation comes back as a tool error whose text says what to change. Before saving,
@@ -94,6 +94,11 @@ the server checks the source: a Codex session id must match a rollout file under
 `$CODEX_HOME/sessions` or `archived_sessions` (default `~/.codex`); a Claude Code session id
 that differs from the server's `CLAUDE_CODE_SESSION_ID` is kept and logged as a warning,
 because the id changes after `/clear` while the server keeps running.
+
+`url` is the note's page in the web UI. Before returning one from `distill_save` or a
+non-empty `distill_recall`, the server makes sure the web UI is running and starts it in the
+background if not ([web-ui.md](web-ui.md)). When that fails, the tool still succeeds and the
+reason is in `warnings`. `ui.autostart = false` turns this off.
 
 `reopen` holds `link` (`codex://threads/<id>` or `claude://resume?session=<id>`) and
 `command` (`codex resume <id>`, or `cd <cwd> && claude --resume <id>`).

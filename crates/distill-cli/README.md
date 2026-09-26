@@ -6,9 +6,13 @@ to stderr with a non-zero exit code.
 ## Install
 
 ```bash
-cargo install --path crates/distill-cli
+mise run install
 distill init
 ```
+
+`mise run install` builds the web UI (`apps/web`, needs Node and pnpm) and then runs
+`cargo install --path crates/distill-cli`, which embeds it. A binary built without
+`apps/web/dist` works, but `distill ui` shows a page asking you to rebuild.
 
 `distill init` proposes `iCloud Drive/Distill` on macOS when iCloud Drive is on, otherwise
 `Distill` in your documents folder. Pass `--vault <dir>` to choose; it accepts `~/…` and, on
@@ -28,8 +32,10 @@ existing vault.
 | `annotate <note-id> <text…>` | Add your own understanding to a note |
 | `reindex` | Rebuild this device's index from the vault |
 | `vault show \| use <dir> \| move <dir>` | Show, switch, or copy-and-switch the vault |
-| `config list \| get <key> \| set <key> <value>` | Settable keys: `ui.port`, `suggest.enabled` |
+| `config list \| get <key> \| set <key> <value>` | Settable keys: `ui.port`, `ui.autostart`, `suggest.enabled` |
 | `doctor` | Paths, plugin install, conflicts, unreadable files; exits non-zero when something needs attention |
+| `ui [--no-open] [--port <port>]` | Start the web UI and open an authorized browser tab ([docs/web-ui.md](../../docs/web-ui.md)) |
+| `ui stop` | Stop the running web UI |
 | `mcp` | Stdio MCP server for the plugin ([docs/plugin.md](../../docs/plugin.md)) |
 | `hook user-prompt-submit` | Hook entry point for the plugin; always exits 0 |
 
@@ -42,5 +48,6 @@ The `SaveRequest` fields and tag rules are in the
 |---|---|
 | `DISTILL_HOME` | Use `$DISTILL_HOME/config` and `$DISTILL_HOME/data` instead of the platform directories |
 | `DISTILL_VAULT` | Use this vault instead of the configured one |
+| `PORT` | `distill ui` serves on this port instead of `ui.port` |
 | `CODEX_HOME` | Codex state directory (default `~/.codex`), for source checks and `doctor` |
 | `CLAUDE_CONFIG_DIR` | Claude Code state directory (default `~/.claude`), for `doctor` |
