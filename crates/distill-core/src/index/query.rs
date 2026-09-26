@@ -92,6 +92,20 @@ pub struct WeekCount {
 
 #[derive(Debug, Clone, Serialize, ts_rs::TS)]
 #[ts(export)]
+pub struct DayCount {
+    pub day: String,
+    pub notes: usize,
+}
+
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct AgentCount {
+    pub agent: Agent,
+    pub notes: usize,
+}
+
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ProjectCount {
     pub project: String,
     pub notes: usize,
@@ -107,7 +121,12 @@ pub struct Stats {
     pub top_topics: Vec<TopicCount>,
     pub tags: Vec<TagCount>,
     pub by_week: Vec<WeekCount>,
+    /// Notes per local calendar day (`2026-09-13`), days without notes left out.
+    pub by_day: Vec<DayCount>,
     pub by_project: Vec<ProjectCount>,
+    pub by_agent: Vec<AgentCount>,
+    /// Topics asked twice or more that have at least one annotation.
+    pub annotated_repeated_topics: usize,
     pub conflicts: usize,
     pub invalid_files: usize,
 }
@@ -298,12 +317,25 @@ impl Index {
         let annotations = self.annotations_by_note()?;
         let mut top = topic_counts(&rows, &self.topic_labels()?, &annotations);
         let repeated_topics = top.iter().filter(|t| t.ask_count >= 2).count();
+        let annotated_repeated_topics = top
+            .iter()
+            .filter(|t| t.ask_count >= 2 && t.annotated)
+            .count();
         let topics = top.len();
         top.truncate(TOP_TOPICS);
 
         let mut weeks: BTreeMap<String, usize> = BTreeMap::new();
         let mut projects: HashMap<String, usize> = HashMap::new();
+        let mut days: BTreeMap<&str, usize> = BTreeMap::new();
+        let mut agents: BTreeMap<&str, (Agent, usize)> = BTreeMap::new();
         for row in &rows {
+            if let Some(day) = row.created.get(..10) {
+                *days.entry(day).or_default() += 1;
+            }
+            agents
+                .entry(row.source.agent.as_str())
+                .or_insert((row.source.agent, 0))
+                .1 += 1;
             if let Some(week) = iso_week(&row.created) {
                 *weeks.entry(week).or_default() += 1;
             }
@@ -331,7 +363,19 @@ impl Index {
                 .into_iter()
                 .map(|(week, notes)| WeekCount { week, notes })
                 .collect(),
+            by_day: days
+                .into_iter()
+                .map(|(day, notes)| DayCount {
+                    day: day.to_string(),
+                    notes,
+                })
+                .collect(),
             by_project,
+            by_agent: agents
+                .into_values()
+                .map(|(agent, notes)| AgentCount { agent, notes })
+                .collect(),
+            annotated_repeated_topics,
             conflicts: self.conflicts()?.len(),
             invalid_files: self.invalid_files()?.len(),
         })

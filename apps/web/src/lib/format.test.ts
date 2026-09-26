@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { excerpt, formatAgo, projectName, stripTitle } from "./format";
+import { dayLabel, excerpt, formatAgo, projectName, stripTitle, withoutSection } from "./format";
 
 describe("formatAgo", () => {
   const now = new Date("2026-09-20T12:00:00Z");
@@ -33,5 +33,24 @@ describe("excerpt", () => {
     expect(
       excerpt("不能直接用：`bun:sqlite` **很慢**。\n\n```ts\nx()\n```\n- [文档](http://a)"),
     ).toBe("不能直接用：bun:sqlite 很慢。 文档");
+  });
+});
+
+describe("dayLabel", () => {
+  const now = new Date("2026-09-26T10:00:00");
+  it("names today and yesterday", () => {
+    expect(dayLabel("2026-09-26", now)).toBe("今天");
+    expect(dayLabel("2026-09-25", now)).toBe("昨天");
+    expect(dayLabel("2026-09-13", now)).toContain("9月13日");
+    expect(dayLabel("2025-12-31", now)).toContain("2025");
+  });
+});
+
+describe("withoutSection", () => {
+  it("drops one section and keeps the rest", () => {
+    const md = "## 问题\n\nq\n\n## 结论\n\nc\n";
+    expect(withoutSection(md, "问题")).toBe("## 结论\n\nc\n");
+    expect(withoutSection(md, "结论")).toBe("## 问题\n\nq\n");
+    expect(withoutSection(md, "要点")).toBe(md);
   });
 });

@@ -1,7 +1,7 @@
 //! Reads behind the web UI's pages: one note with everything its page shows, one topic with
 //! its timeline, every topic, and the vault files behind topics and annotations.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use rusqlite::OptionalExtension;
 use serde::Serialize;
@@ -9,7 +9,9 @@ use serde::Serialize;
 use super::Index;
 use super::query::{NoteView, TopicCount, note_view, resolve_merge, topic_counts};
 use crate::error::Result;
+use crate::model::Source;
 use crate::sources::{Reopen, reopen};
+use crate::tags::resolve_alias;
 
 #[derive(Debug, Clone, Serialize, ts_rs::TS)]
 #[ts(export)]
@@ -49,7 +51,92 @@ pub struct TopicDetail {
     pub notes: Vec<NoteView>,
 }
 
+/// One note on the timeline: the question and the start of the answer, plus where it sits
+/// in its topic.
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct TimelineItem {
+    pub id: String,
+    pub topic_id: String,
+    pub topic_label: String,
+    pub title: String,
+    pub question: String,
+    pub conclusion: String,
+    pub tags: Vec<String>,
+    pub created: String,
+    pub source: Source,
+    /// This note is the Nth in its topic, oldest first: "the Nth time you asked".
+    pub ask_index: usize,
+    /// Notes in the topic.
+    pub ask_count: usize,
+    pub annotations: usize,
+}
+
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct TimelinePage {
+    /// Newest first.
+    pub items: Vec<TimelineItem>,
+    /// Pass back as `before` for the next page; absent after the last page.
+    #[ts(optional)]
+    pub next: Option<String>,
+}
+
 impl Index {
+    /// Notes newest first, optionally only those with `tag`, in pages of `limit`. `before`
+    /// is the `next` cursor of the previous page.
+    pub fn timeline(
+        &self,
+        tag: Option<&str>,
+        before: Option<&str>,
+        limit: usize,
+    ) -> Result<TimelinePage> {
+        let mut rows = self.rows()?;
+        rows.sort_by(|a, b| {
+            b.created_utc
+                .cmp(&a.created_utc)
+                .then_with(|| b.id.cmp(&a.id))
+        });
+        let mut position: HashMap<&str, usize> = HashMap::new();
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        for row in rows.iter().rev() {
+            let n = counts.entry(row.topic_id.as_str()).or_default();
+            *n += 1;
+            position.insert(row.id.as_str(), *n);
+        }
+        let aliases = self.aliases()?;
+        let tag = tag.map(|t| resolve_alias(t, &aliases));
+        let labels = self.topic_labels()?;
+        let annotations = self.annotations_by_note()?;
+        let mut matching = rows
+            .iter()
+            .filter(|r| tag.as_ref().is_none_or(|t| r.tags.contains(t)))
+            .filter(|r| before.is_none_or(|b| cursor(&r.created_utc, &r.id).as_str() < b));
+        let chosen: Vec<_> = matching.by_ref().take(limit).collect();
+        let next = match (matching.next(), chosen.last()) {
+            (Some(_), Some(last)) => Some(cursor(&last.created_utc, &last.id)),
+            _ => None,
+        };
+        let page = chosen
+            .into_iter()
+            .map(|row| TimelineItem {
+                id: row.id.clone(),
+                topic_id: row.topic_id.clone(),
+                topic_label: labels.get(&row.topic_id).cloned().unwrap_or_default(),
+                title: row.title.clone(),
+                question: row.question.clone(),
+                conclusion: row.conclusion.clone(),
+                tags: row.tags.clone(),
+                created: row.created.clone(),
+                source: row.source.clone(),
+                ask_index: position[row.id.as_str()],
+                ask_count: counts[row.topic_id.as_str()],
+                annotations: annotations.get(&row.id).map_or(0, Vec::len),
+            })
+            .collect();
+        Ok(TimelinePage { items: page, next })
+    }
+
     pub fn note_detail(&self, id: &str) -> Result<Option<NoteDetail>> {
         let Some(note) = self.note(id)? else {
             return Ok(None);
@@ -141,4 +228,9 @@ impl Index {
             )
             .optional()?)
     }
+}
+
+/// Sorts like the timeline: by UTC creation time, then id.
+fn cursor(created_utc: &str, id: &str) -> String {
+    format!("{created_utc} {id}")
 }

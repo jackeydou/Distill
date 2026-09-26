@@ -16,7 +16,7 @@
 - `distill model pull` downloads the embedding model and embeds existing notes;
   `distill model status` reports it. `distill recall`, `distill_recall` and the web UI use it
   when installed; `distill_recall` returns `semantic`. `doctor` shows whether it is installed.
-- Web API: `GET /api/topics/{id}/similar`, `GET /api/duplicates`,
+- Web API: `GET /api/timeline`, `GET /api/topics/{id}/similar`, `GET /api/duplicates`,
   `POST /api/duplicates/dismiss`.
 - `distill mcp` starts the web UI in the background before returning note links, unless
   `ui.autostart` is `false`. `distill_recall` and `distill_search` notes now carry `url`.

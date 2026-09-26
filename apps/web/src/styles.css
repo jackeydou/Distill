@@ -109,6 +109,9 @@
   font-size: 1rem;
   line-height: 1.75;
 }
+.prose-note > :first-child {
+  margin-top: 0;
+}
 .prose-note > * + * {
   margin-top: 1.25rem;
 }

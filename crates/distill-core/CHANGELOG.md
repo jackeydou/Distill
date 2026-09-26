@@ -20,6 +20,8 @@
 - `schema` feature: JSON Schema for `SaveRequest`, used as the MCP tool schema.
 - Reads for the web UI: `Index::note_detail` (body, file, topic label, ask count, reopen
   links), `Index::topic_detail` (timeline, sessions, merged-in topics) and `Index::topics`.
+- `Index::timeline`: notes newest first, paged by cursor, optionally by tag, each with its
+  position in its topic. `Stats` gains `by_day`, `by_agent` and `annotated_repeated_topics`.
 - Edits for the web UI: `Distill::rename_topic`, `merge_topic`, `update_annotation`,
   `delete_annotation` and `resolve_conflict`. Settling a conflict moves the other copies to
   `<data dir>/discarded/<vault id>/` instead of deleting them.

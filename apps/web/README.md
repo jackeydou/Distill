@@ -7,7 +7,7 @@ or index; everything goes through the JSON API in [docs/web-ui.md](../../docs/we
 ## Stack
 
 React 19 with the React Compiler, TanStack Router (code-based routes in `src/router.tsx`) and
-TanStack Query, Tailwind v4, `virtua` for long lists, `cmdk` for the ⌘K palette,
+TanStack Query, Tailwind v4, `cmdk` for the ⌘K palette,
 `react-markdown` with GFM for note bodies. Fonts come from `@fontsource` packages (IBM Plex
 Serif, iA Writer Quattro, Lilex; Latin subsets) and ship inside the bundle, so the UI works
 offline. Chinese text falls back to the system's CJK fonts.
@@ -21,7 +21,7 @@ offline. Chinese text falls back to the system's CJK fonts.
 | `src/api/queries.ts` | Query keys, the query client, the SSE subscription that refetches on change |
 | `src/api/generated/` | TypeScript API types generated from Rust by ts-rs. Never edit by hand |
 | `src/pages/` | One component per route |
-| `src/components/` | Shared pieces: layout, note list, annotations, charts, command palette |
+| `src/components/` | Shared pieces: layout and sidebar, annotations, charts, command palette |
 | `src/lib/` | Formatting and ISO-week helpers, with tests |
 | `src/styles.css` | Design tokens (semantic color roles, fonts) and note prose styles |
 
@@ -30,15 +30,15 @@ Design direction and token rules: the
 
 ## Pages
 
+The sidebar has two tabs, Distill and Review, and below them every tag with its note count.
+Choosing a tag filters the Distill timeline.
+
 | Route | Shows |
 |---|---|
-| `/` | Most-asked topics, repeated topics without an annotation, recent notes, a banner when files need attention |
-| `/notes?q=` | Keyword search, or recent notes |
-| `/notes/$noteId` | The note, its topic and ask count, tags, annotations (add, edit, delete), how to reopen the session |
-| `/topics?view=asked\|recent\|undigested\|duplicates` | Every topic, or topic pairs that are probably one question |
+| `/?tag=` | **Distill**: every note newest first, grouped by day. Each entry shows the question and the first two lines of the conclusion; activating it loads the whole note in place. Loads 30 at a time as you scroll |
+| `/review` | **Review**: this week against last week, repeat rate, annotation coverage of repeated topics, active days; a 26-week activity calendar; notes per week; most-asked and unannotated topics; duplicate topic suggestions; notes by tag, project and agent |
+| `/notes/$noteId` | The note, its topic and ask count, tags, annotations (add, edit, delete), how to reopen the session. Agent links point here |
 | `/topics/$topicId` | Timeline of the topic's notes; rename; similar topics; merge into another topic |
-| `/tags`, `/tags/$tag` | Tags by note count; notes with a tag |
-| `/stats` | Counts, notes per ISO week (16 weeks), most-asked and unannotated topics, tags, projects |
 | `/problems` | Sync conflicts (keep one copy) and unreadable files |
 
 ## Scripts

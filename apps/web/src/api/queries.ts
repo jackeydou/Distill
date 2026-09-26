@@ -1,4 +1,10 @@
-import { QueryClient, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  infiniteQueryOptions,
+  QueryClient,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useEffect } from "react";
 import { ApiError } from "./bridge";
 import { api } from "./client";
@@ -16,6 +22,13 @@ export const queryClient = new QueryClient({
 
 export const q = {
   session: () => queryOptions({ queryKey: ["session"], queryFn: api.session }),
+  timeline: (tag: string | undefined) =>
+    infiniteQueryOptions({
+      queryKey: ["timeline", tag],
+      queryFn: ({ pageParam }) => api.timeline({ tag, before: pageParam, limit: 30 }),
+      initialPageParam: undefined as string | undefined,
+      getNextPageParam: (page) => page.next,
+    }),
   notes: (query: NotesQuery) =>
     queryOptions({ queryKey: ["notes", query], queryFn: () => api.notes(query) }),
   note: (id: string) => queryOptions({ queryKey: ["note", id], queryFn: () => api.note(id) }),

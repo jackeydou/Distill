@@ -65,6 +65,7 @@ as `{ "error": "<message>" }` with 400 (invalid input), 401, 403, 404 (unknown i
 |---|---|
 | `GET /api/health` | `Health`; no session needed |
 | `GET /api/session` | `Session`: version, vault path, UI origin, whether the embedding model is installed |
+| `GET /api/timeline?tag=&before=&limit=` | `TimelinePage`: notes newest first with question, ask position and annotation count; `next` is the cursor for `before` |
 | `GET /api/notes?q=&tag=&limit=` | `NoteHit[]`: keyword search, or recent notes when `q` is empty |
 | `GET /api/notes/{id}` | `NoteDetail` |
 | `POST /api/notes/{id}/annotations` | Adds an annotation (`AnnotationInput`); returns the updated `NoteDetail` |
@@ -77,7 +78,7 @@ as `{ "error": "<message>" }` with 400 (invalid input), 401, 403, 404 (unknown i
 | `GET /api/duplicates` | `Duplicates`: topic pairs that are probably one question ([recall.md](recall.md)) |
 | `POST /api/duplicates/dismiss` | Stops suggesting a pair (`PairDismissal`) on this device |
 | `GET /api/tags` | `TagCount[]` |
-| `GET /api/stats` | `Stats` |
+| `GET /api/stats` | `Stats`, including notes per day and per agent |
 | `GET /api/recall?q=` | `RecallResult` |
 | `GET /api/problems` | `Problems`: sync conflicts and unreadable files |
 | `POST /api/conflicts/resolve` | Keeps one copy (`ConflictChoice`) and moves the rest to `<data dir>/discarded/` |

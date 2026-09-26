@@ -24,6 +24,7 @@ the per-device SQLite index derived from it, and the operations that read and wr
 | `embed::Embedder` | The local embedding model: `pull`, `installed`, `load` (cached per process), `embed` |
 | `Index::search` | Keyword search, optionally filtered by tag |
 | `Index::stats` / `tags` | Counts by topic, tag, ISO week and project |
+| `Index::timeline` | Notes newest first in cursor pages, optionally by tag |
 | `Index::note_detail` / `topic_detail` / `topics` | What the web UI's note, topic and topic-list pages show |
 | `redact::redact` | Secret redaction applied before anything reaches the vault |
 | `sources` | Hook input and agent detection, injected context, source verification, reopen links, installed-plugin detection |

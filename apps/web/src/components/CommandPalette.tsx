@@ -92,7 +92,7 @@ export function CommandPalette({
                 key={t.tag}
                 value={`tag:${t.tag}`}
                 className={ITEM}
-                onSelect={() => go(() => navigate({ to: "/tags/$tag", params: { tag: t.tag } }))}
+                onSelect={() => go(() => navigate({ to: "/", search: { tag: t.tag } }))}
               >
                 <Hash className="size-4 shrink-0 text-ink-faint" aria-hidden />
                 {t.tag}

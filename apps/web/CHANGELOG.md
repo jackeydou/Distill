@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+- The sidebar holds two tabs, Distill and Review, with every tag listed below them. Distill
+  is a timeline of notes (question plus the first two lines of the conclusion, expanding in
+  place to the whole note); Review is a dashboard of activity metrics. The separate home,
+  notes, topics, tags and stats pages are gone; their content moved into these two.
+
 ### Added
 - Web UI served by `distill ui`: home, notes search, note page, topics with timelines, tags,
   stats and a problems page. See `README.md`.

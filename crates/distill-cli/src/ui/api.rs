@@ -13,7 +13,7 @@ use distill_core::Distill;
 use distill_core::embed::Embedder;
 use distill_core::index::{
     Conflict, InvalidFile, NoteDetail, NoteHit, RecallResult, SimilarTopic, Stats, TagCount,
-    TopicCount, TopicDetail,
+    TimelinePage, TopicCount, TopicDetail,
 };
 use distill_core::ops::Duplicates;
 use serde::{Deserialize, Serialize};
@@ -48,6 +48,18 @@ pub struct NotesQuery {
     pub q: Option<String>,
     #[ts(optional)]
     pub tag: Option<String>,
+    #[ts(optional)]
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct TimelineQuery {
+    #[ts(optional)]
+    pub tag: Option<String>,
+    /// The `next` cursor from the previous page.
+    #[ts(optional)]
+    pub before: Option<String>,
     #[ts(optional)]
     pub limit: Option<usize>,
 }
@@ -124,6 +136,7 @@ const MAX_LIMIT: usize = 500;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/session", get(session))
+        .route("/timeline", get(timeline))
         .route("/notes", get(notes))
         .route("/notes/{id}", get(note))
         .route("/notes/{id}/annotations", post(add_annotation))
@@ -172,6 +185,18 @@ async fn notes(
     read(&s, move |d| {
         d.index
             .search(q.q.as_deref().unwrap_or_default(), q.tag.as_deref(), limit)
+    })
+    .await
+}
+
+async fn timeline(
+    State(s): State<AppState>,
+    Query(q): Query<TimelineQuery>,
+) -> Result<Json<TimelinePage>, ApiError> {
+    let limit = q.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT);
+    read(&s, move |d| {
+        d.index
+            .timeline(q.tag.as_deref(), q.before.as_deref(), limit)
     })
     .await
 }

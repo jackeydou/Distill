@@ -12,6 +12,8 @@ import type { Session } from "./generated/Session";
 import type { SimilarTopic } from "./generated/SimilarTopic";
 import type { Stats } from "./generated/Stats";
 import type { TagCount } from "./generated/TagCount";
+import type { TimelinePage } from "./generated/TimelinePage";
+import type { TimelineQuery } from "./generated/TimelineQuery";
 import type { TopicCount } from "./generated/TopicCount";
 import type { TopicDetail } from "./generated/TopicDetail";
 import type { TopicMerge } from "./generated/TopicMerge";
@@ -32,6 +34,8 @@ export function queryString(params: object): string {
 
 export const api = {
   session: () => bridge().request<Session>("GET", "/session"),
+  timeline: (q: TimelineQuery) =>
+    bridge().request<TimelinePage>("GET", `/timeline${queryString(q)}`),
   notes: (q: NotesQuery) => bridge().request<NoteHit[]>("GET", `/notes${queryString(q)}`),
   note: (id: string) => bridge().request<NoteDetail>("GET", `/notes/${enc(id)}`),
   addAnnotation: (noteId: string, body: AnnotationInput) =>

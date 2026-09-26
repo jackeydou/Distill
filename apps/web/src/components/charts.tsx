@@ -93,19 +93,13 @@ export function Columns({ columns, unit }: { columns: Column[]; unit: string }) 
 
 export type Bar = { key: string; label: string; value: number };
 
-/** Horizontal bars for a ranking (tags, projects), value at the tip. */
-export function BarList({
-  bars,
-  link,
-}: {
-  bars: Bar[];
-  link?: (bar: Bar) => { to: string; params?: Record<string, string> };
-}) {
+/** Horizontal bars for a ranking (tags, projects, agents), value at the tip. With
+ * `tagLinks`, each label filters the Distill timeline by that tag. */
+export function BarList({ bars, tagLinks }: { bars: Bar[]; tagLinks?: boolean }) {
   const max = Math.max(1, ...bars.map((b) => b.value));
   return (
     <ul className="space-y-1">
       {bars.map((b) => {
-        const target = link?.(b);
         const label = (
           <span className="block truncate text-sm text-ink" title={b.label}>
             {b.label}
@@ -114,12 +108,12 @@ export function BarList({
         return (
           <li
             key={b.key}
-            className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] items-center gap-3"
+            className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] items-center gap-3"
           >
-            {target ? (
+            {tagLinks ? (
               <Link
-                to={target.to}
-                params={target.params}
+                to="/"
+                search={{ tag: b.key }}
                 className="min-w-0 hover:[&>span]:text-brand-ink"
               >
                 {label}
@@ -128,16 +122,122 @@ export function BarList({
               label
             )}
             <span className="flex items-center gap-2">
-              <span
-                className="block h-3 rounded-r-[2px] bg-brand"
-                style={{ width: `calc(${(b.value / max) * 100}% - 2.5rem)` }}
-              />
-              <span className="text-xs text-ink-muted tabular-nums">{b.value}</span>
+              <span className="h-3 min-w-0 flex-1">
+                <span
+                  className="block h-3 rounded-r-[2px] bg-brand"
+                  style={{ width: `${(b.value / max) * 100}%` }}
+                />
+              </span>
+              <span className="w-7 shrink-0 text-right text-xs text-ink-muted tabular-nums">
+                {b.value}
+              </span>
             </span>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+export type Day = { day: string; label: string; value: number; future: boolean };
+
+const CELL = 12;
+/** Light to dark steps of the brand hue, mixed into the panel so both themes work. */
+const LEVELS = [30, 55, 78, 100];
+
+function level(value: number, max: number): string {
+  if (value <= 0) {
+    return "var(--color-line)";
+  }
+  const step = LEVELS[Math.min(LEVELS.length - 1, Math.ceil((value / max) * LEVELS.length) - 1)];
+  return `color-mix(in oklch, var(--color-brand) ${step}%, var(--color-panel))`;
+}
+
+/**
+ * Notes per day as a calendar grid: one column per week (Monday on top), one sequential
+ * hue. Hover shows the day's count; the table below carries every value.
+ */
+/** "9月" above the first column of each month, blank elsewhere. The leading partial
+ * month gets no label when the next one starts within three columns, so labels never
+ * collide. */
+function monthStart(weeks: Day[][], i: number): string {
+  const month = (w: Day[] | undefined) => w?.[0]?.day.slice(0, 7);
+  if (i > 0 && month(weeks[i]) === month(weeks[i - 1])) {
+    return "";
+  }
+  if (i === 0 && [1, 2].some((j) => month(weeks[j]) !== month(weeks[0]))) {
+    return "";
+  }
+  const day = weeks[i]?.[0]?.day;
+  return day ? `${Number(day.slice(5, 7))}月` : "";
+}
+
+export function Heatmap({ weeks, unit }: { weeks: Day[][]; unit: string }) {
+  const [active, setActive] = useState<Day | null>(null);
+  const max = Math.max(1, ...weeks.flat().map((d) => d.value));
+  return (
+    <figure>
+      <div className="overflow-x-auto pb-1">
+        <div className="relative inline-flex gap-[2px]" onPointerLeave={() => setActive(null)}>
+          {weeks.map((week, i) => (
+            <div key={week[0]?.day} className="flex flex-col gap-[2px]">
+              <span className="h-4 text-[10px] leading-none whitespace-nowrap text-ink-faint">
+                {monthStart(weeks, i)}
+              </span>
+              {week.map((d) => (
+                <span
+                  key={d.day}
+                  onPointerEnter={() => setActive(d)}
+                  className={cx(
+                    "block rounded-[2px]",
+                    active?.day === d.day && "outline-1 outline-offset-1 outline-ink",
+                  )}
+                  style={{
+                    width: CELL,
+                    height: CELL,
+                    background: d.future ? "transparent" : level(d.value, max),
+                  }}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+      <figcaption className="mt-2 flex flex-wrap items-center gap-3 text-xs text-ink-faint">
+        <span className="min-h-4 text-ink" aria-live="polite">
+          {active ? (
+            <>
+              <strong className="tabular-nums">
+                {active.value} {unit}
+              </strong>{" "}
+              <span className="text-ink-faint">{active.label}</span>
+            </>
+          ) : (
+            "悬停查看某一天"
+          )}
+        </span>
+        <span className="ml-auto flex items-center gap-1">
+          少
+          {[0, ...LEVELS.map((_, i) => ((i + 1) / LEVELS.length) * max)].map((v) => (
+            <span
+              key={v}
+              className="inline-block rounded-[2px]"
+              style={{ width: CELL, height: CELL, background: level(v, max) }}
+            />
+          ))}
+          多
+        </span>
+      </figcaption>
+      <DataTable
+        head={["日期", unit]}
+        rows={weeks
+          .flat()
+          .filter((d) => d.value > 0)
+          .reverse()
+          .map((d) => [d.label, d.value])}
+        className="mt-3"
+      />
+    </figure>
   );
 }
 

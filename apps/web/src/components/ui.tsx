@@ -125,8 +125,8 @@ export function AskCount({ count, className }: { count: number; className?: stri
 export function TagChip({ tag }: { tag: string }) {
   return (
     <Link
-      to="/tags/$tag"
-      params={{ tag }}
+      to="/"
+      search={{ tag }}
       className="inline-flex items-center rounded-[1px] border border-line px-1.5 py-px text-xs text-ink-muted transition-colors duration-150 hover:border-brand hover:text-brand-ink"
     >
       #{tag}
@@ -157,7 +157,7 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
 export function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
     <div className="rounded-panel border border-line bg-panel px-4 py-3">
-      <div className="text-xs uppercase tracking-wider text-ink-faint">{label}</div>
+      <div className="text-xs text-ink-faint">{label}</div>
       <div className="mt-1 text-3xl font-bold text-ink">{value}</div>
       {hint && <div className="mt-1 text-xs text-ink-faint">{hint}</div>}
     </div>

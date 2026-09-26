@@ -73,3 +73,51 @@ export function excerpt(markdown: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+const timeFormat = new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" });
+const monthDay = new Intl.DateTimeFormat("zh-CN", {
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+});
+const yearMonthDay = new Intl.DateTimeFormat("zh-CN", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+});
+
+export function formatTime(rfc3339: string): string {
+  return timeFormat.format(new Date(rfc3339));
+}
+
+/** `YYYY-MM-DD` of a date in the viewer's time zone. */
+export function localDay(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Heading for a day on the timeline: 今天, 昨天, or the date. */
+export function dayLabel(day: string, now: Date = new Date()): string {
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (day === localDay(now)) {
+    return "今天";
+  }
+  if (day === localDay(yesterday)) {
+    return "昨天";
+  }
+  const date = new Date(`${day}T12:00:00`);
+  return (date.getFullYear() === now.getFullYear() ? monthDay : yearMonthDay).format(date);
+}
+
+/** A note body without one `## <heading>` section. */
+export function withoutSection(markdown: string, heading: string): string {
+  const lines = markdown.split("\n");
+  const start = lines.findIndex((l) => l.trim() === `## ${heading}`);
+  if (start < 0) {
+    return markdown;
+  }
+  const next = lines.findIndex((l, i) => i > start && l.startsWith("## "));
+  return [...lines.slice(0, start), ...(next < 0 ? [] : lines.slice(next))].join("\n");
+}

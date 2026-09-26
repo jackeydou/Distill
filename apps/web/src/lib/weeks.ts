@@ -31,3 +31,19 @@ export function weeksEnding(last: string, count: number): { key: string; monday:
     return { key: weekKey(monday), monday };
   });
 }
+
+/**
+ * The last `count` calendar weeks up to `now`, Monday first, as local `YYYY-MM-DD` days.
+ * Days after `now` are included so every column has seven cells.
+ */
+export function calendarWeeks(count: number, now: Date = new Date()): Date[][] {
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) - (count - 1) * 7);
+  return Array.from({ length: count }, (_, w) =>
+    Array.from({ length: 7 }, (_, d) => {
+      const day = new Date(monday);
+      day.setDate(monday.getDate() + w * 7 + d);
+      return day;
+    }),
+  );
+}

@@ -20,10 +20,10 @@ use rusqlite_migration::{M, Migrations};
 
 use crate::error::{IoContext, Result};
 
-pub use browse::{NoteDetail, TopicDetail, TopicRef};
+pub use browse::{NoteDetail, TimelineItem, TimelinePage, TopicDetail, TopicRef};
 pub use query::{
-    AnnotationView, Conflict, InvalidFile, NoteHit, NoteView, ProjectCount, RecallResult,
-    RecallTopic, Stats, TagCount, TopicCount, WeekCount,
+    AgentCount, AnnotationView, Conflict, DayCount, InvalidFile, NoteHit, NoteView, ProjectCount,
+    RecallResult, RecallTopic, Stats, TagCount, TopicCount, WeekCount,
 };
 pub use scan::SyncReport;
 pub use semantic::{DUPLICATE_MIN, SimilarTopic, TopicPair};

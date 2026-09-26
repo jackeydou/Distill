@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, Outlet } from "@tanstack/react-router";
-import { Search } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Search, TriangleAlert } from "lucide-react";
+import { useState } from "react";
 import { ApiError } from "../api/bridge";
 import { q, useVaultEvents } from "../api/queries";
 import { CommandPalette } from "./CommandPalette";
 import { ThemeToggle } from "./ThemeToggle";
-import { ErrorBox, Loading } from "./ui";
+import { cx, ErrorBox, Loading } from "./ui";
 
 export function Layout() {
   const session = useQuery(q.session());
@@ -17,10 +17,10 @@ export function Layout() {
     return <AuthRequired />;
   }
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
       <Sidebar onSearch={() => setPaletteOpen(true)} />
-      <main className="min-w-0 px-4 pt-6 pb-24 sm:px-8 lg:px-12 lg:pt-12">
-        <div className="mx-auto max-w-[52rem]">
+      <main className="min-w-0 px-4 pt-6 pb-24 sm:px-8 lg:px-12 lg:pt-10">
+        <div className="mx-auto max-w-[64rem]">
           {session.isPending ? (
             <Loading />
           ) : session.isError ? (
@@ -35,82 +35,153 @@ export function Layout() {
   );
 }
 
+type Tab = "distill" | "review";
+
+/** Review owns the dashboard and the problems page; everything else reads notes. */
+function currentTab(pathname: string): Tab {
+  return pathname.startsWith("/review") || pathname.startsWith("/problems") ? "review" : "distill";
+}
+
 function Sidebar({ onSearch }: { onSearch: () => void }) {
+  const location = useRouterState({ select: (s) => s.location });
+  const tab = currentTab(location.pathname);
+  const activeTag =
+    location.pathname === "/" && typeof location.search.tag === "string"
+      ? location.search.tag
+      : undefined;
   const problems = useQuery(q.problems());
   const problemCount =
     (problems.data?.conflicts.length ?? 0) + (problems.data?.invalid_files.length ?? 0);
+
   return (
-    <aside className="border-b border-line bg-panel lg:sticky lg:top-0 lg:h-screen lg:border-r lg:border-b-0">
-      <div className="flex items-center justify-between gap-2 px-4 py-3 lg:px-5 lg:pt-6 lg:pb-5">
+    <aside className="flex flex-col border-b border-line bg-panel lg:sticky lg:top-0 lg:h-screen lg:border-r lg:border-b-0">
+      <div className="flex items-center justify-between gap-2 px-4 pt-3 lg:px-5 lg:pt-6">
         <Link to="/" className="flex items-center gap-2 font-display text-xl text-ink">
           <span className="inline-block size-3 bg-brand" aria-hidden />
           Distill
         </Link>
         <div className="flex items-center gap-2 lg:hidden">
           <ThemeToggle />
-          <button
-            type="button"
-            onClick={onSearch}
-            className="inline-flex h-8 items-center gap-2 rounded-[1px] border border-line px-2 text-sm text-ink-faint transition-colors duration-150 hover:border-line-strong hover:text-ink"
-            aria-label="搜索"
-          >
-            <Search className="size-4" aria-hidden />
-          </button>
+          <SearchButton onClick={onSearch} compact />
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onSearch}
-        className="mx-5 mb-4 hidden h-9 w-[calc(100%-2.5rem)] items-center gap-2 rounded-[1px] border border-line px-2.5 text-sm text-ink-faint transition-colors duration-150 hover:border-line-strong hover:text-ink lg:flex"
-      >
-        <Search className="size-4" aria-hidden />
-        搜索
-        <kbd className="ml-auto font-mono text-xs">⌘K</kbd>
-      </button>
-      <nav
-        aria-label="主导航"
-        className="flex gap-1 overflow-x-auto px-3 pb-2 lg:flex-col lg:gap-0.5 lg:px-4 lg:pb-0"
-      >
-        <NavItem to="/">首页</NavItem>
-        <NavItem to="/notes">Notes</NavItem>
-        <NavItem to="/topics">Topics</NavItem>
-        <NavItem to="/tags">Tags</NavItem>
-        <NavItem to="/stats">统计</NavItem>
-        {problemCount > 0 && (
-          <NavItem to="/problems">
-            需要处理
-            <span className="ml-1.5 rounded-[1px] bg-error px-1 text-xs text-on-brand tabular-nums">
-              {problemCount}
-            </span>
-          </NavItem>
-        )}
+
+      <nav aria-label="主导航" className="px-4 pt-4 lg:px-5">
+        <div className="grid grid-cols-2 rounded-panel border border-line-strong p-0.5">
+          <TabLink to="/" active={tab === "distill"}>
+            Distill
+          </TabLink>
+          <TabLink to="/review" active={tab === "review"}>
+            Review
+          </TabLink>
+        </div>
       </nav>
-      <div className="hidden px-4 lg:absolute lg:bottom-4 lg:block">
+
+      <div className="hidden px-5 pt-3 lg:block">
+        <SearchButton onClick={onSearch} />
+      </div>
+
+      <TagList activeTag={activeTag} />
+
+      <div className="hidden items-center justify-between gap-2 border-t border-line px-4 py-3 lg:flex">
         <ThemeToggle />
+        {problemCount > 0 && (
+          <Link
+            to="/problems"
+            className="inline-flex items-center gap-1.5 rounded-[1px] px-2 py-1 text-xs text-error hover:bg-error-soft"
+          >
+            <TriangleAlert className="size-3.5" aria-hidden />
+            {problemCount} 需要处理
+          </Link>
+        )}
       </div>
     </aside>
   );
 }
 
-function NavItem({ to, children }: { to: string; children: ReactNode }) {
+function TabLink({
+  to,
+  active,
+  children,
+}: {
+  to: "/" | "/review";
+  active: boolean;
+  children: string;
+}) {
   return (
     <Link
       to={to}
-      activeOptions={{ exact: to === "/" }}
-      className="flex shrink-0 items-center py-1 text-sm lg:py-0.5"
-    >
-      {({ isActive }) => (
-        <span
-          className={
-            isActive
-              ? "rounded-[1px] bg-brand-strong px-2 py-1 text-on-brand"
-              : "rounded-[1px] px-2 py-1 text-ink-muted transition-colors duration-150 hover:text-ink"
-          }
-        >
-          {children}
-        </span>
+      aria-current={active ? "page" : undefined}
+      className={cx(
+        "rounded-[1px] py-1.5 text-center text-sm transition-colors duration-150",
+        active
+          ? "bg-brand-strong text-on-brand"
+          : "text-ink-muted hover:bg-panel-hover hover:text-ink",
       )}
+    >
+      {children}
     </Link>
+  );
+}
+
+function SearchButton({ onClick, compact }: { onClick: () => void; compact?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="搜索"
+      className={cx(
+        "flex h-8 items-center gap-2 rounded-[1px] border border-line text-sm text-ink-faint transition-colors duration-150 hover:border-line-strong hover:text-ink",
+        compact ? "px-2" : "w-full px-2.5",
+      )}
+    >
+      <Search className="size-4" aria-hidden />
+      {!compact && (
+        <>
+          搜索
+          <kbd className="ml-auto font-mono text-xs">⌘K</kbd>
+        </>
+      )}
+    </button>
+  );
+}
+
+/** Every tag, most used first. Choosing one filters the Distill timeline. */
+function TagList({ activeTag }: { activeTag: string | undefined }) {
+  const tags = useQuery(q.tags());
+  const items = tags.data ?? [];
+  return (
+    <section aria-label="Tags" className="min-h-0 lg:flex lg:flex-1 lg:flex-col lg:pt-6">
+      <h2 className="hidden px-5 pb-2 font-body text-[11px] tracking-wider text-ink-faint uppercase lg:block">
+        Tags
+      </h2>
+      <ul className="flex gap-1.5 overflow-x-auto px-4 py-3 lg:block lg:flex-1 lg:space-y-px lg:overflow-y-auto lg:px-3 lg:py-0 lg:pb-4">
+        {items.map((t) => {
+          const active = t.tag === activeTag;
+          return (
+            <li key={t.tag} className="shrink-0">
+              <Link
+                to="/"
+                search={active ? {} : { tag: t.tag }}
+                aria-current={active ? "true" : undefined}
+                className={cx(
+                  "flex items-center gap-2 rounded-[1px] border px-2 py-1 text-sm transition-colors duration-150 lg:border-0",
+                  active
+                    ? "border-brand bg-brand-soft text-brand-ink"
+                    : "border-line text-ink-muted hover:bg-panel-hover hover:text-ink",
+                )}
+              >
+                <span className="truncate">#{t.tag}</span>
+                <span className="ml-auto text-xs text-ink-faint tabular-nums">{t.notes}</span>
+              </Link>
+            </li>
+          );
+        })}
+        {tags.isSuccess && items.length === 0 && (
+          <li className="px-2 text-sm text-ink-faint">还没有 tag</li>
+        )}
+      </ul>
+    </section>
   );
 }
 
