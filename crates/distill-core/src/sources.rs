@@ -252,7 +252,8 @@ fn has_rollout(dir: &Path, session_id: &str) -> bool {
 /// How to get back to the session a note came from: a desktop-app deep link and a
 /// terminal command that works without the app. Neither URL scheme is documented by its
 /// vendor; both were verified by hand on 2026-09-13 (spec D6).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct Reopen {
     pub link: String,
     pub command: String,

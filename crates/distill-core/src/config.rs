@@ -8,6 +8,9 @@ use crate::error::{Error, IoContext, Result};
 use crate::fsutil::write_atomic;
 
 pub const DEFAULT_UI_PORT: u16 = 4777;
+/// Host name of the web UI. `*.localhost` resolves to loopback without touching the hosts
+/// file, and the session cookie is bound to it rather than to every `localhost` port.
+pub const UI_HOST: &str = "distill.localhost";
 
 /// Overrides both the config and data directories. Used by tests and by users who want
 /// several independent Distill setups on one machine.
@@ -49,6 +52,11 @@ impl Dirs {
     pub fn index_file(&self, vault_id: &str) -> PathBuf {
         self.data_dir.join("index").join(format!("{vault_id}.db"))
     }
+
+    /// Where copies set aside while settling a sync conflict go. Never synced.
+    pub fn discarded_dir(&self, vault_id: &str) -> PathBuf {
+        self.data_dir.join("discarded").join(vault_id)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,12 +75,21 @@ pub struct LocalConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiConfig {
     pub port: u16,
+    /// Whether `distill mcp` starts the web server in the background before it hands the
+    /// agent a link, so the link opens.
+    #[serde(default = "enabled")]
+    pub autostart: bool,
+}
+
+fn enabled() -> bool {
+    true
 }
 
 impl Default for UiConfig {
     fn default() -> Self {
         Self {
             port: DEFAULT_UI_PORT,
+            autostart: true,
         }
     }
 }
@@ -89,7 +106,7 @@ impl Default for SuggestConfig {
 }
 
 /// Keys `distill config get/set` accepts. `vault` is changed with `distill vault use/move`.
-pub const SETTABLE_KEYS: &[&str] = &["ui.port", "suggest.enabled"];
+pub const SETTABLE_KEYS: &[&str] = &["ui.port", "ui.autostart", "suggest.enabled"];
 
 impl LocalConfig {
     pub fn load(dirs: &Dirs) -> Result<Self> {
@@ -124,6 +141,7 @@ impl LocalConfig {
             "vault" => Ok(self.vault_path().display().to_string()),
             "device_id" => Ok(self.device_id.clone()),
             "ui.port" => Ok(self.ui.port.to_string()),
+            "ui.autostart" => Ok(self.ui.autostart.to_string()),
             "suggest.enabled" => Ok(self.suggest.enabled.to_string()),
             _ => Err(unknown_key(key)),
         }
@@ -145,6 +163,11 @@ impl LocalConfig {
                 }
                 self.ui.port = port;
             }
+            "ui.autostart" => {
+                self.ui.autostart = value
+                    .parse()
+                    .map_err(|_| invalid("expected true or false"))?;
+            }
             "suggest.enabled" => {
                 self.suggest.enabled = value
                     .parse()
@@ -156,7 +179,13 @@ impl LocalConfig {
     }
 
     pub fn note_url(&self, note_id: &str) -> String {
-        format!("http://distill.localhost:{}/notes/{note_id}", self.ui.port)
+        format!("{}/notes/{note_id}", self.ui_origin())
+    }
+
+    /// The fixed address of the web UI (spec D7). Links built on it stay valid because
+    /// the port is chosen once at init.
+    pub fn ui_origin(&self) -> String {
+        format!("http://{UI_HOST}:{}", self.ui.port)
     }
 }
 

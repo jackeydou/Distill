@@ -1,0 +1,186 @@
+@import "tailwindcss";
+@import "@fontsource/ibm-plex-serif/latin-400.css";
+@import "@fontsource/ibm-plex-serif/latin-500.css";
+@import "@fontsource/ia-writer-quattro/latin-400.css";
+@import "@fontsource/ia-writer-quattro/latin-700.css";
+@import "@fontsource/lilex/latin-400.css";
+
+/* Semantic roles mapped from the Delta reference (.agents/skills/distill-ui-design).
+   Light values are the defaults; [data-theme="dark"] overrides the same variables. Plain
+   @theme (not inline) keeps utilities pointing at the variables so the override applies. */
+@theme {
+  --color-canvas: #f3eee6;
+  --color-panel: #faf8f5;
+  --color-panel-hover: #f5f0ea;
+  --color-card: #f1eae0;
+  --color-ink: #2f3339;
+  --color-ink-muted: #545a64;
+  --color-ink-faint: #7a808a;
+  --color-line: #e0d9cf;
+  --color-line-strong: #afb3b9;
+  --color-brand: #d5442c;
+  --color-brand-strong: #be3c26;
+  --color-brand-ink: #9d301e;
+  --color-brand-soft: rgb(213 68 44 / 0.1);
+  --color-on-brand: #faf8f5;
+  --color-focus: #eca597;
+  --color-error: #b63132;
+  --color-error-soft: rgb(182 49 50 / 0.1);
+  --color-success: #227849;
+  --color-warning: #ab6f00;
+  --color-warning-soft: rgb(171 111 0 / 0.12);
+
+  --font-display: "IBM Plex Serif", ui-serif, Georgia, "Songti SC", "Noto Serif CJK SC", serif;
+  --font-body:
+    "iA Writer Quattro", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
+    ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Lilex", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-panel: 2px;
+  --tracking-heading: -0.025em;
+}
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+[data-theme="dark"] {
+  --color-canvas: #121010;
+  --color-panel: #1b1918;
+  --color-panel-hover: #23201e;
+  --color-card: #221e1c;
+  --color-ink: #ece9e6;
+  --color-ink-muted: #b0aaa3;
+  --color-ink-faint: #837c75;
+  --color-line: #332f2c;
+  --color-line-strong: #5a5450;
+  --color-brand: #e0553b;
+  --color-brand-strong: #be3c26;
+  --color-brand-ink: #f08a72;
+  --color-brand-soft: rgb(224 85 59 / 0.14);
+  --color-on-brand: #faf8f5;
+  --color-focus: #a8452f;
+  --color-error: #e0676a;
+  --color-error-soft: rgb(224 103 106 / 0.14);
+  --color-success: #52b27d;
+  --color-warning: #d9a13a;
+  --color-warning-soft: rgb(217 161 58 / 0.14);
+}
+
+@layer base {
+  html {
+    background: var(--color-canvas);
+    color: var(--color-ink-muted);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    color: var(--color-ink);
+    letter-spacing: var(--tracking-heading);
+    font-weight: 400;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-brand-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat every utility's duration. */
+    transition-duration: 0ms !important;
+  }
+}
+
+/* Rendered note Markdown. */
+.prose-note {
+  color: var(--color-ink-muted);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.prose-note > :first-child {
+  margin-top: 0;
+}
+.prose-note > * + * {
+  margin-top: 1.25rem;
+}
+.prose-note h2 {
+  font-size: 1.375rem;
+  line-height: 1.3;
+  margin-top: 2.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.prose-note h3 {
+  font-size: 1.125rem;
+  margin-top: 1.75rem;
+}
+.prose-note ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.prose-note ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+}
+.prose-note li + li {
+  margin-top: 0.35rem;
+}
+.prose-note li::marker {
+  color: var(--color-brand);
+}
+.prose-note a {
+  color: var(--color-brand-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose-note strong {
+  color: var(--color-ink);
+}
+.prose-note code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  border: 1px solid var(--color-line);
+  padding: 0.05rem 0.35rem;
+}
+.prose-note pre {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+}
+.prose-note pre code {
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+.prose-note blockquote {
+  border-left: 2px solid var(--color-brand);
+  padding-left: 1rem;
+  color: var(--color-ink-faint);
+}
+.prose-note table {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.prose-note th,
+.prose-note td {
+  border: 1px solid var(--color-line);
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+}

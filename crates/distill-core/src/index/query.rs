@@ -4,18 +4,20 @@ use rusqlite::{Connection, OptionalExtension, params_from_iter};
 use serde::Serialize;
 
 use super::Index;
-use super::recall::{Doc, rank};
+use super::recall::{Doc, fuse, rank};
 use crate::error::Result;
 use crate::model::{Agent, Source};
 use crate::tags::resolve_alias;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct TagCount {
     pub tag: String,
     pub notes: usize,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct AnnotationView {
     pub id: String,
     pub body: String,
@@ -23,7 +25,8 @@ pub struct AnnotationView {
     pub updated: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct NoteView {
     pub id: String,
     pub topic_id: String,
@@ -37,7 +40,8 @@ pub struct NoteView {
     pub annotations: Vec<AnnotationView>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct NoteHit {
     pub id: String,
     pub topic_id: String,
@@ -48,7 +52,8 @@ pub struct NoteHit {
     pub path: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct RecallTopic {
     pub topic_id: String,
     pub label: String,
@@ -57,14 +62,18 @@ pub struct RecallTopic {
     pub notes: Vec<NoteView>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct RecallResult {
     pub topics: Vec<RecallTopic>,
     /// Every tag in use, so the agent can reuse one instead of inventing a near-duplicate.
     pub tags: Vec<TagCount>,
+    /// Whether embeddings took part. False until `distill model pull` has run.
+    pub semantic: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct TopicCount {
     pub topic_id: String,
     pub label: String,
@@ -74,19 +83,36 @@ pub struct TopicCount {
     pub annotated: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct WeekCount {
     pub week: String,
     pub notes: usize,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct DayCount {
+    pub day: String,
+    pub notes: usize,
+}
+
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct AgentCount {
+    pub agent: Agent,
+    pub notes: usize,
+}
+
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ProjectCount {
     pub project: String,
     pub notes: usize,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct Stats {
     pub notes: usize,
     pub topics: usize,
@@ -95,19 +121,26 @@ pub struct Stats {
     pub top_topics: Vec<TopicCount>,
     pub tags: Vec<TagCount>,
     pub by_week: Vec<WeekCount>,
+    /// Notes per local calendar day (`2026-09-13`), days without notes left out.
+    pub by_day: Vec<DayCount>,
     pub by_project: Vec<ProjectCount>,
+    pub by_agent: Vec<AgentCount>,
+    /// Topics asked twice or more that have at least one annotation.
+    pub annotated_repeated_topics: usize,
     pub conflicts: usize,
     pub invalid_files: usize,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct Conflict {
     pub kind: String,
     pub id: String,
     pub paths: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct InvalidFile {
     pub path: String,
     pub error: String,
@@ -116,17 +149,17 @@ pub struct InvalidFile {
 /// One row of `note_current`, with topic and tags already resolved through merges and
 /// aliases.
 #[derive(Debug, Clone)]
-struct Row {
-    id: String,
-    path: String,
-    topic_id: String,
-    title: String,
-    question: String,
-    conclusion: String,
-    created: String,
-    created_utc: String,
-    source: Source,
-    tags: Vec<String>,
+pub(super) struct Row {
+    pub id: String,
+    pub path: String,
+    pub topic_id: String,
+    pub title: String,
+    pub question: String,
+    pub conclusion: String,
+    pub created: String,
+    pub created_utc: String,
+    pub source: Source,
+    pub tags: Vec<String>,
 }
 
 const TOP_TOPICS: usize = 20;
@@ -157,8 +190,20 @@ impl Index {
     }
 
     /// Topics whose notes resemble `question`, best match first, each with all of its
-    /// notes and their annotations.
+    /// notes and their annotations. Keyword matching only; `Distill::recall` adds
+    /// embeddings when the model is installed.
     pub fn recall(&self, question: &str, limit: usize) -> Result<RecallResult> {
+        self.recall_with(question, limit, None)
+    }
+
+    /// `semantic` holds note ids ranked by embedding similarity, best first, already cut at
+    /// the similarity floor. It is fused with the keyword ranking.
+    pub(super) fn recall_with(
+        &self,
+        question: &str,
+        limit: usize,
+        semantic: Option<&[String]>,
+    ) -> Result<RecallResult> {
         let rows = self.rows()?;
         let by_id: HashMap<&str, &Row> = rows.iter().map(|r| (r.id.as_str(), r)).collect();
         let bodies = self.bodies()?;
@@ -170,7 +215,11 @@ impl Index {
                 body: bodies.get(&r.id).map_or("", String::as_str),
             })
             .collect();
-        let ids = rank(question, &docs);
+        let keyword = rank(question, &docs);
+        let ids = match semantic {
+            Some(semantic) => fuse(&[&keyword, semantic]),
+            None => keyword,
+        };
         let labels = self.topic_labels()?;
         let annotations = self.annotations_by_note()?;
         let mut topics: Vec<String> = Vec::new();
@@ -202,6 +251,7 @@ impl Index {
         Ok(RecallResult {
             topics,
             tags: tag_counts(&rows),
+            semantic: semantic.is_some(),
         })
     }
 
@@ -264,35 +314,28 @@ impl Index {
 
     pub fn stats(&self) -> Result<Stats> {
         let rows = self.rows()?;
-        let labels = self.topic_labels()?;
         let annotations = self.annotations_by_note()?;
-        let mut by_topic: BTreeMap<&str, Vec<&Row>> = BTreeMap::new();
-        for row in &rows {
-            by_topic.entry(&row.topic_id).or_default().push(row);
-        }
-        let mut top: Vec<TopicCount> = by_topic
-            .iter()
-            .map(|(topic_id, notes)| TopicCount {
-                topic_id: topic_id.to_string(),
-                label: labels.get(*topic_id).cloned().unwrap_or_default(),
-                ask_count: notes.len(),
-                first_asked: min_created(notes, |a, b| a < b),
-                last_asked: min_created(notes, |a, b| a > b),
-                annotated: notes.iter().any(|n| annotations.contains_key(&n.id)),
-            })
-            .collect();
-        top.sort_by(|a, b| {
-            b.ask_count
-                .cmp(&a.ask_count)
-                .then(b.last_asked.cmp(&a.last_asked))
-        });
+        let mut top = topic_counts(&rows, &self.topic_labels()?, &annotations);
         let repeated_topics = top.iter().filter(|t| t.ask_count >= 2).count();
+        let annotated_repeated_topics = top
+            .iter()
+            .filter(|t| t.ask_count >= 2 && t.annotated)
+            .count();
         let topics = top.len();
         top.truncate(TOP_TOPICS);
 
         let mut weeks: BTreeMap<String, usize> = BTreeMap::new();
         let mut projects: HashMap<String, usize> = HashMap::new();
+        let mut days: BTreeMap<&str, usize> = BTreeMap::new();
+        let mut agents: BTreeMap<&str, (Agent, usize)> = BTreeMap::new();
         for row in &rows {
+            if let Some(day) = row.created.get(..10) {
+                *days.entry(day).or_default() += 1;
+            }
+            agents
+                .entry(row.source.agent.as_str())
+                .or_insert((row.source.agent, 0))
+                .1 += 1;
             if let Some(week) = iso_week(&row.created) {
                 *weeks.entry(week).or_default() += 1;
             }
@@ -320,7 +363,19 @@ impl Index {
                 .into_iter()
                 .map(|(week, notes)| WeekCount { week, notes })
                 .collect(),
+            by_day: days
+                .into_iter()
+                .map(|(day, notes)| DayCount {
+                    day: day.to_string(),
+                    notes,
+                })
+                .collect(),
             by_project,
+            by_agent: agents
+                .into_values()
+                .map(|(agent, notes)| AgentCount { agent, notes })
+                .collect(),
+            annotated_repeated_topics,
             conflicts: self.conflicts()?.len(),
             invalid_files: self.invalid_files()?.len(),
         })
@@ -360,7 +415,7 @@ impl Index {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    fn merges(&self) -> Result<HashMap<String, String>> {
+    pub(super) fn merges(&self) -> Result<HashMap<String, String>> {
         let mut stmt = self
             .conn
             .prepare("SELECT id, merged_into FROM topic_current WHERE merged_into IS NOT NULL")?;
@@ -368,19 +423,19 @@ impl Index {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    fn topic_labels(&self) -> Result<HashMap<String, String>> {
+    pub(super) fn topic_labels(&self) -> Result<HashMap<String, String>> {
         let mut stmt = self.conn.prepare("SELECT id, label FROM topic_current")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    fn bodies(&self) -> Result<HashMap<String, String>> {
+    pub(super) fn bodies(&self) -> Result<HashMap<String, String>> {
         let mut stmt = self.conn.prepare("SELECT id, body FROM note_current")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    fn annotations_by_note(&self) -> Result<HashMap<String, Vec<AnnotationView>>> {
+    pub(super) fn annotations_by_note(&self) -> Result<HashMap<String, Vec<AnnotationView>>> {
         let mut stmt = self.conn.prepare(
             "SELECT note_id, id, body, created, updated FROM annotation_current ORDER BY created",
         )?;
@@ -403,7 +458,7 @@ impl Index {
         Ok(out)
     }
 
-    fn rows(&self) -> Result<Vec<Row>> {
+    pub(super) fn rows(&self) -> Result<Vec<Row>> {
         let merges = self.merges()?;
         let aliases = self.aliases()?;
         let mut tags: HashMap<String, Vec<String>> = HashMap::new();
@@ -465,7 +520,7 @@ impl Index {
     }
 }
 
-fn note_view(row: &Row, annotations: &HashMap<String, Vec<AnnotationView>>) -> NoteView {
+pub(super) fn note_view(row: &Row, annotations: &HashMap<String, Vec<AnnotationView>>) -> NoteView {
     NoteView {
         id: row.id.clone(),
         topic_id: row.topic_id.clone(),
@@ -480,7 +535,36 @@ fn note_view(row: &Row, annotations: &HashMap<String, Vec<AnnotationView>>) -> N
     }
 }
 
-fn tag_counts(rows: &[Row]) -> Vec<TagCount> {
+/// One entry per topic that has notes, most asked first, then most recently asked.
+pub(super) fn topic_counts(
+    rows: &[Row],
+    labels: &HashMap<String, String>,
+    annotations: &HashMap<String, Vec<AnnotationView>>,
+) -> Vec<TopicCount> {
+    let mut by_topic: BTreeMap<&str, Vec<&Row>> = BTreeMap::new();
+    for row in rows {
+        by_topic.entry(&row.topic_id).or_default().push(row);
+    }
+    let mut out: Vec<TopicCount> = by_topic
+        .iter()
+        .map(|(topic_id, notes)| TopicCount {
+            topic_id: topic_id.to_string(),
+            label: labels.get(*topic_id).cloned().unwrap_or_default(),
+            ask_count: notes.len(),
+            first_asked: min_created(notes, |a, b| a < b),
+            last_asked: min_created(notes, |a, b| a > b),
+            annotated: notes.iter().any(|n| annotations.contains_key(&n.id)),
+        })
+        .collect();
+    out.sort_by(|a, b| {
+        b.ask_count
+            .cmp(&a.ask_count)
+            .then(b.last_asked.cmp(&a.last_asked))
+    });
+    out
+}
+
+pub(super) fn tag_counts(rows: &[Row]) -> Vec<TagCount> {
     let mut counts: HashMap<&str, usize> = HashMap::new();
     for tag in rows.iter().flat_map(|r| &r.tags) {
         *counts.entry(tag).or_default() += 1;
@@ -506,7 +590,7 @@ fn min_created(notes: &[&Row], better: impl Fn(&str, &str) -> bool) -> String {
     best.map(|n| n.created.clone()).unwrap_or_default()
 }
 
-fn resolve_merge(id: &str, merges: &HashMap<String, String>) -> String {
+pub(super) fn resolve_merge(id: &str, merges: &HashMap<String, String>) -> String {
     let mut current = id.to_string();
     let mut seen = HashSet::new();
     while let Some(next) = merges.get(&current) {

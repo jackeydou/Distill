@@ -234,6 +234,16 @@ agent 判断是不是同一个问题。它本来就是 LLM，判断语义等价�
 > 按中文二字组和英文单词打分，按 IDF 加权，标题和问题里的命中权重加倍，覆盖不到问题总权重
 > 25% 的丢弃。关键词搜索仍用 trigram FTS。实现：`crates/distill-core/src/index/recall.rs`。
 
+> **2026-09-26 实现备注（P4）。** embedding 用 fastembed（ONNX Runtime 静态链接进 `distill`）加
+> 量化版 `paraphrase-multilingual-MiniLM-L12-v2`（384 维，磁盘约 0.25 GB），这个模型专门训练过
+> 同义句匹配，中英文都能用（2026-09-26 讨论确定，放弃了 candle + multilingual-e5-small 和调用本机
+> Ollama）。模型不自动下载，`distill model pull` 显式拉取；没拉取时 recall 保持关键词打分。
+> 向量按原计划放 `sqlite-vec` 的 `vec0` 表、用 KNN 查询。注册扩展要一段 `unsafe`，工作区的
+> `unsafe_code` 从 `forbid` 改为 `deny`，只有 `index/vec.rs` 例外。note 向量按「模型 + 文本 hash」
+> 做主键，`reindex` 不清它；topic 向量是 note 向量的均值，另存一张 `vec0` 表。融合用 RRF（k = 60）。阈值是实测出来的：12 对中英文问题里，
+> 同一问题换说法得 0.40–0.74，不同问题最高 0.54，两段重叠，所以 recall 的下限定在 0.40、交给 agent
+> 判断，合并建议的下限定在 0.65、交给用户确认。现状见 `docs/recall.md`。
+
 照搬 reflect-open 的 `retrieve()`：一个函数提供 keyword / semantic / hybrid 三种模式，hybrid
 用 RRF 融合，低于相似度阈值的丢弃。embedding 不可用时自动退回 FTS。
 
@@ -428,6 +438,20 @@ v1 的交付物只有一个 `distill` 可执行文件，`distill ui` 在本机�
 上面的做法不需要 sudo 也能做到。也不监听 80 端口：本机实测非 root 可以绑定 `0.0.0.0:80`，
 但那会把服务暴露给局域网；绑定 `127.0.0.1:80` 需要 root。
 
+> **2026-09-26 实现备注（P3）。** 与上文不同的几处：
+>
+> - 没有单独的锁文件。`/api/health` 返回 `{"app": "distill", ...}`，启动前先问端口，它就是锁；两个
+>   进程同时启动时，绑定失败的一方再问一次健康检查。
+> - 后台启动用独立进程组（Unix `process_group(0)`，Windows `DETACHED_PROCESS`），不 fork 两次；
+>   `distill mcp` 拉起前检查本机配置 `ui.autostart`（默认开），关掉后不拉起。
+> - 一次性 token 和长期 secret 都放在数据目录 `ui/` 下，所以不管服务是谁拉起的，终端里的
+>   `distill ui` 都能给浏览器授权。
+> - 除了 cookie 和 Host，还校验 `Origin`：所有 `*.localhost` 端口都算同一个 site，`SameSite=Strict`
+>   挡不住本机其他开发服务器带着 cookie 发 POST。非 GET 请求没有 `Origin` 时，只接受带 secret 的
+>   CLI 请求。
+>
+> 现状见 `docs/web-ui.md`。
+
 **localhost 安全必须做对。** 用户打开的任何网页都能向 localhost 发请求，所以：
 
 - 只监听回环地址（`127.0.0.1` 和 `::1`）；
@@ -470,6 +494,9 @@ Tauri 把同一个 Web UI 装进窗口。core 是 Rust crate，可以直接链�
 | 样式 | Tailwind v4，按 [distill-ui-design](../../.agents/skills/distill-ui-design/SKILL.md) 的设计规范 |
 | 长列表 | `virtua` |
 | 命令面板 | `cmdk` |
+
+> **2026-09-26 实现备注（P3）。** 路由用代码定义，不生成 route tree；topic 列表只有几种固定排序，
+> 没有引入 TanStack Table。字体用 `@fontsource` 拉丁子集随构建离线提供，中文回落到系统字体。
 
 不需要 SSR：页面只在本机打开，首屏是从 localhost 读几百 KB 的静态文件。所以不用
 TanStack Start 这类全栈框架，服务端只有 `distill ui` 一个。
@@ -652,5 +679,22 @@ Q9 → D12，Q12 → D6，Q14 → 下面这条：
 | 后台任务的 LLM 和 embedding 从哪来（原 Q5） | P4 | 本地多语 embedding + 无头 agent（`codex exec` / `claude -p`）做 topic 命名和 tag 整理 |
 | 更多来源（原 Q8） | 需要时 | ChatGPT / Claude.ai 导出、Cursor、Gemini CLI；只影响 `SourceAdapter` 接口 |
 
+> **2026-09-26 决定（P3、P4 开工时）。**
+>
+> - **Q11**：按倾向做。Web UI 能增删改 annotation、给 topic 改名、合并 topic、处理冲突副本。保留
+>   冲突中的一份时，其余副本移到本机数据目录 `discarded/<vault-id>/`，不删除。note 正文和 tag
+>   仍用编辑器改。
+> - **Q13**：候选全做。统计页有每周 note 数（最近 16 周）、按 tag / 项目的分布、重问最多的
+>   topic、重问过却没有 annotation 的 topic；topic 的时间线放在 topic 页。
+> - **Q15**：只做整条 note 的 annotation，`anchor` 继续保留不写。
+> - **Q5**：embedding 见 D3 的 2026-09-26 备注。topic 命名与合并**不跑后台 LLM**：topic 的名字
+>   在 Web UI 手动改，embedding 找出「可能是同一个问题」的 topic 对，在 Web UI 列出来，由用户一键
+>   合并或标记「不是同一个问题」（标记只存在本机索引里）。无头 agent 会消耗用户的 agent 额度、
+>   结果不确定，而命名只影响可读性、不影响提问次数，不值得。tag 整理仍靠 D5 的别名文件，没有自动化。
+
 P2 用起来 2–4 周后回看一次数据：重问是否真的频繁、匹配是否准。这是对整个产品假设的验证，
 结果决定 P3、P4 的优先级。
+
+> **2026-09-26 进展。** P3、P4 已实现。P4 退出标准由 `semantic.rs` 覆盖（需先拉取模型）；P3 的
+> 授权、note 页、tag 跳转已在本机浏览器走过。未验证：真实会话里点开 agent 给的链接并深链跳回
+> 原会话；Linux、Windows 上 `*.localhost` 的解析。

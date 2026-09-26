@@ -9,7 +9,9 @@ rust-version = "1.95"
 license = "MIT"
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# `deny`, not `forbid`, so the one audited exception can opt in:
+# crates/distill-core/src/index/vec.rs registers sqlite-vec with SQLite.
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 unwrap_used = "warn"

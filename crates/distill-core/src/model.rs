@@ -7,9 +7,10 @@ use crate::error::{Error, Result};
 
 pub const SCHEMA: u32 = 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "kebab-case")]
+#[ts(export)]
 pub enum Agent {
     Codex,
     ClaudeCode,
@@ -36,8 +37,9 @@ impl Agent {
 
 /// Where a note came from. Copy the values from the `distill-source:` line the Distill hook
 /// injects: `distill-source: <agent> <session_id> <cwd>`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[ts(export)]
 pub struct Source {
     pub agent: Agent,
     /// UUID of the agent session.
@@ -46,6 +48,7 @@ pub struct Source {
     pub cwd: String,
     /// Git remote of the project, if known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub git_repo: Option<String>,
 }
 

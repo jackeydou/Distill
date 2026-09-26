@@ -4,9 +4,12 @@
 //! web server), so it runs in WAL mode with a busy timeout, and every sync writes inside
 //! one immediate transaction.
 
+mod browse;
 mod query;
 mod recall;
 mod scan;
+mod semantic;
+mod vec;
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -17,14 +20,20 @@ use rusqlite_migration::{M, Migrations};
 
 use crate::error::{IoContext, Result};
 
+pub use browse::{NoteDetail, TimelineItem, TimelinePage, TopicDetail, TopicRef};
 pub use query::{
-    AnnotationView, Conflict, InvalidFile, NoteHit, NoteView, ProjectCount, RecallResult,
-    RecallTopic, Stats, TagCount, TopicCount, WeekCount,
+    AgentCount, AnnotationView, Conflict, DayCount, InvalidFile, NoteHit, NoteView, ProjectCount,
+    RecallResult, RecallTopic, Stats, TagCount, TopicCount, WeekCount,
 };
 pub use scan::SyncReport;
+pub use semantic::{DUPLICATE_MIN, SimilarTopic, TopicPair};
 
-static MIGRATIONS: LazyLock<Migrations<'static>> =
-    LazyLock::new(|| Migrations::new(vec![M::up(include_str!("../../migrations/0001_init.sql"))]));
+static MIGRATIONS: LazyLock<Migrations<'static>> = LazyLock::new(|| {
+    Migrations::new(vec![
+        M::up(include_str!("../../migrations/0001_init.sql")),
+        M::up(include_str!("../../migrations/0002_embeddings.sql")),
+    ])
+});
 
 pub struct Index {
     conn: Connection,
@@ -36,6 +45,7 @@ impl Index {
         if let Some(dir) = db_path.parent() {
             std::fs::create_dir_all(dir).at(dir)?;
         }
+        vec::register()?;
         let mut conn = Connection::open(db_path)?;
         conn.busy_timeout(Duration::from_secs(5))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;

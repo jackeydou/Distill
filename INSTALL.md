@@ -9,14 +9,16 @@ steps that are already done, and ask the user only where a step says so.
 
 Check: `distill --version` prints `distill 0.0.1` or later.
 
-If it is missing, build it (needs a Rust toolchain; `rustup` or `mise` provides one):
+If it is missing, build it from a clone of `<source>`. It needs Rust, Node 22 and pnpm;
+`mise install` provides all three.
 
 ```bash
-cargo install --path crates/distill-cli
+mise run install
 ```
 
-Run that from a clone of `<source>`. With only a Git URL:
-`cargo install --git <source> distill-cli`.
+That builds the web UI and then runs `cargo install --path crates/distill-cli --locked`, which
+embeds it. `cargo install --git <source> distill-cli` also works but leaves out the web UI:
+`distill ui` then shows a page asking for a rebuild.
 
 ## 2. This device
 
@@ -68,6 +70,12 @@ distill doctor
 
 It should list the plugin under "Plugins" and end with "All good." Then tell the user to open a
 new session: plugins load when a session starts.
+
+Optional: `distill model pull` downloads a 0.25 GB embedding model so recall also finds
+questions asked in different words or another language. Ask the user first; it can run later.
+
+Finally, run `distill ui` once. It opens the web UI in the browser and authorizes it; links
+the agent hands out later open without asking again.
 
 ## Uninstall
 
