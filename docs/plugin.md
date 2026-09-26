@@ -84,7 +84,7 @@ run `distill init`.
 
 | Tool | Returns |
 |---|---|
-| `distill_recall` | Matching topics with `ask_count`, their notes (with `url`, `file`, annotations and `reopen`), every tag in use, and `warnings` |
+| `distill_recall` | Matching topics with `ask_count`, their notes (with `url`, `file`, annotations and `reopen`), every tag in use, `semantic` (whether embeddings took part, [recall.md](recall.md)), and `warnings` |
 | `distill_save` | The save result (`note_id`, `topic_id`, `ask_count`, `tags`, `url`, `file`) plus `warnings` |
 | `distill_search` | Notes matching keywords and/or a tag, with `url` and `file` |
 | `distill_stats` | The same counts as `distill stats --json` |

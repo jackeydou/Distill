@@ -35,8 +35,8 @@ Design direction and token rules: the
 | `/` | Most-asked topics, repeated topics without an annotation, recent notes, a banner when files need attention |
 | `/notes?q=` | Keyword search, or recent notes |
 | `/notes/$noteId` | The note, its topic and ask count, tags, annotations (add, edit, delete), how to reopen the session |
-| `/topics?view=asked\|recent\|undigested` | Every topic |
-| `/topics/$topicId` | Timeline of the topic's notes; rename; merge into another topic |
+| `/topics?view=asked\|recent\|undigested\|duplicates` | Every topic, or topic pairs that are probably one question |
+| `/topics/$topicId` | Timeline of the topic's notes; rename; similar topics; merge into another topic |
 | `/tags`, `/tags/$tag` | Tags by note count; notes with a tag |
 | `/stats` | Counts, notes per ISO week (16 weeks), most-asked and unannotated topics, tags, projects |
 | `/problems` | Sync conflicts (keep one copy) and unreadable files |

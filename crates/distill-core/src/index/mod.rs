@@ -8,6 +8,7 @@ mod browse;
 mod query;
 mod recall;
 mod scan;
+mod semantic;
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -24,9 +25,14 @@ pub use query::{
     RecallTopic, Stats, TagCount, TopicCount, WeekCount,
 };
 pub use scan::SyncReport;
+pub use semantic::{DUPLICATE_MIN, SimilarTopic, TopicPair};
 
-static MIGRATIONS: LazyLock<Migrations<'static>> =
-    LazyLock::new(|| Migrations::new(vec![M::up(include_str!("../../migrations/0001_init.sql"))]));
+static MIGRATIONS: LazyLock<Migrations<'static>> = LazyLock::new(|| {
+    Migrations::new(vec![
+        M::up(include_str!("../../migrations/0001_init.sql")),
+        M::up(include_str!("../../migrations/0002_embeddings.sql")),
+    ])
+});
 
 pub struct Index {
     conn: Connection,

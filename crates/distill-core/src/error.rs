@@ -91,6 +91,15 @@ pub enum Error {
     #[error("could not read {path}: {reason}")]
     InvalidFile { path: PathBuf, reason: String },
 
+    #[error(
+        "embedding model failed while {action}. Run `distill model pull` to download it again."
+    )]
+    Embedding {
+        action: String,
+        #[source]
+        source: fastembed::Error,
+    },
+
     #[error("I/O error at {path}")]
     Io {
         path: PathBuf,

@@ -15,7 +15,7 @@ const root = createRootRoute({
   notFoundComponent: () => <Empty>这个页面不存在。</Empty>,
 });
 
-const TOPIC_VIEWS: TopicView[] = ["asked", "recent", "undigested"];
+const TOPIC_VIEWS: TopicView[] = ["asked", "recent", "undigested", "duplicates"];
 
 const routeTree = root.addChildren([
   createRoute({ getParentRoute: () => root, path: "/", component: HomePage }),

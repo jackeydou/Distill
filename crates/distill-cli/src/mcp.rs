@@ -69,7 +69,7 @@ impl DistillServer {
     ) -> Result<CallToolResult, McpError> {
         respond(|| {
             let d = Distill::open()?;
-            let result = d.index.recall(&p.question, p.limit.unwrap_or(5))?;
+            let result = d.recall(&p.question, p.limit.unwrap_or(5))?;
             let warnings = if result.topics.is_empty() {
                 Vec::new()
             } else {
@@ -87,7 +87,12 @@ impl DistillServer {
                     })
                 })
                 .collect();
-            Ok(json!({ "topics": topics, "tags": result.tags, "warnings": warnings }))
+            Ok(json!({
+                "topics": topics,
+                "tags": result.tags,
+                "semantic": result.semantic,
+                "warnings": warnings,
+            }))
         })
     }
 

@@ -30,6 +30,7 @@ existing vault.
 | `stats` | Notes, topics, repeats, tags, weeks, projects |
 | `tags` | Tags in use with note counts |
 | `annotate <note-id> <text…>` | Add your own understanding to a note |
+| `model pull \| status` | Download the embedding model recall uses for reworded questions (about 0.25 GB), or check it ([docs/recall.md](../../docs/recall.md)) |
 | `reindex` | Rebuild this device's index from the vault |
 | `vault show \| use <dir> \| move <dir>` | Show, switch, or copy-and-switch the vault |
 | `config list \| get <key> \| set <key> <value>` | Settable keys: `ui.port`, `ui.autostart`, `suggest.enabled` |

@@ -7,9 +7,12 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::config::{Dirs, LocalConfig, UiConfig, ensure_dir, pick_ui_port};
+use crate::embed::Embedder;
 use crate::error::{Error, IoContext, Result};
 use crate::fsutil::{content_hash, now_rfc3339};
-use crate::index::{Conflict, Index, InvalidFile, SyncReport};
+use crate::index::{
+    Conflict, Index, InvalidFile, RecallResult, SimilarTopic, SyncReport, TopicPair,
+};
 use crate::model::{AnnotationMeta, NoteBody, NoteMeta, SCHEMA, Source, TopicMeta};
 use crate::redact::redact;
 use crate::sources::{InstalledPlugin, SourceEnv, installed_plugins};
@@ -427,10 +430,50 @@ impl Distill {
             index_file: self.dirs.index_file(self.vault.id()),
             bin_path: self.config.bin_path.clone(),
             ui_port: self.config.ui.port,
+            embedding_model: Embedder::installed(&self.dirs),
             plugins,
             conflicts,
             invalid_files,
         })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct Duplicates {
+    /// False until `distill model pull` has run; `pairs` is then empty.
+    pub model_installed: bool,
+    pub pairs: Vec<TopicPair>,
+}
+
+/// Recall and topic similarity, with embeddings when the model is installed.
+impl Distill {
+    pub fn recall(&self, question: &str, limit: usize) -> Result<RecallResult> {
+        match Embedder::load(&self.dirs)? {
+            Some(embedder) => self.index.recall_semantic(question, limit, &embedder),
+            None => self.index.recall(question, limit),
+        }
+    }
+
+    pub fn duplicate_topics(&self) -> Result<Duplicates> {
+        Ok(match Embedder::load(&self.dirs)? {
+            Some(embedder) => Duplicates {
+                model_installed: true,
+                pairs: self.index.duplicate_topics(&embedder)?,
+            },
+            None => Duplicates {
+                model_installed: false,
+                pairs: Vec::new(),
+            },
+        })
+    }
+
+    /// Topics close to `topic_id`; empty without the model.
+    pub fn similar_topics(&self, topic_id: &str, limit: usize) -> Result<Vec<SimilarTopic>> {
+        match Embedder::load(&self.dirs)? {
+            Some(embedder) => self.index.similar_topics(topic_id, limit, &embedder),
+            None => Ok(Vec::new()),
+        }
     }
 }
 
@@ -444,6 +487,9 @@ pub struct DoctorReport {
     pub index_file: PathBuf,
     pub bin_path: Option<PathBuf>,
     pub ui_port: u16,
+    /// Whether the embedding model is installed. Without it recall uses keywords only;
+    /// that is not counted as a problem.
+    pub embedding_model: bool,
     pub plugins: Vec<InstalledPlugin>,
     pub conflicts: Vec<Conflict>,
     pub invalid_files: Vec<InvalidFile>,

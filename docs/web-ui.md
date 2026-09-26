@@ -64,7 +64,7 @@ as `{ "error": "<message>" }` with 400 (invalid input), 401, 403, 404 (unknown i
 | Route | Returns / does |
 |---|---|
 | `GET /api/health` | `Health`; no session needed |
-| `GET /api/session` | `Session`: version, vault path, UI origin |
+| `GET /api/session` | `Session`: version, vault path, UI origin, whether the embedding model is installed |
 | `GET /api/notes?q=&tag=&limit=` | `NoteHit[]`: keyword search, or recent notes when `q` is empty |
 | `GET /api/notes/{id}` | `NoteDetail` |
 | `POST /api/notes/{id}/annotations` | Adds an annotation (`AnnotationInput`); returns the updated `NoteDetail` |
@@ -73,6 +73,9 @@ as `{ "error": "<message>" }` with 400 (invalid input), 401, 403, 404 (unknown i
 | `GET /api/topics/{id}` | `TopicDetail`; a merged-away id returns the topic it resolves to |
 | `PUT /api/topics/{id}` | Renames (`TopicRename`) |
 | `POST /api/topics/{id}/merge` | Merges this topic into `TopicMerge.into`; returns `Merged` |
+| `GET /api/topics/{id}/similar` | `SimilarTopic[]`; empty without the embedding model |
+| `GET /api/duplicates` | `Duplicates`: topic pairs that are probably one question ([recall.md](recall.md)) |
+| `POST /api/duplicates/dismiss` | Stops suggesting a pair (`PairDismissal`) on this device |
 | `GET /api/tags` | `TagCount[]` |
 | `GET /api/stats` | `Stats` |
 | `GET /api/recall?q=` | `RecallResult` |

@@ -4,4 +4,8 @@ export type Session = { version: string, vault: string,
 /**
  * `http://distill.localhost:<port>`, the address links point at.
  */
-origin: string, };
+origin: string, 
+/**
+ * Whether `distill model pull` has run; enables similar-topic suggestions.
+ */
+embedding_model: boolean, };

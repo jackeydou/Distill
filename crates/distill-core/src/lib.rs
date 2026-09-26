@@ -3,6 +3,7 @@
 
 pub mod config;
 mod edit;
+pub mod embed;
 pub mod error;
 mod fsutil;
 pub mod index;

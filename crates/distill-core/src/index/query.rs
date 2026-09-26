@@ -4,7 +4,7 @@ use rusqlite::{Connection, OptionalExtension, params_from_iter};
 use serde::Serialize;
 
 use super::Index;
-use super::recall::{Doc, rank};
+use super::recall::{Doc, fuse, rank};
 use crate::error::Result;
 use crate::model::{Agent, Source};
 use crate::tags::resolve_alias;
@@ -68,6 +68,8 @@ pub struct RecallResult {
     pub topics: Vec<RecallTopic>,
     /// Every tag in use, so the agent can reuse one instead of inventing a near-duplicate.
     pub tags: Vec<TagCount>,
+    /// Whether embeddings took part. False until `distill model pull` has run.
+    pub semantic: bool,
 }
 
 #[derive(Debug, Clone, Serialize, ts_rs::TS)]
@@ -169,8 +171,20 @@ impl Index {
     }
 
     /// Topics whose notes resemble `question`, best match first, each with all of its
-    /// notes and their annotations.
+    /// notes and their annotations. Keyword matching only; `Distill::recall` adds
+    /// embeddings when the model is installed.
     pub fn recall(&self, question: &str, limit: usize) -> Result<RecallResult> {
+        self.recall_with(question, limit, None)
+    }
+
+    /// `semantic` holds note ids ranked by embedding similarity, best first, already cut at
+    /// the similarity floor. It is fused with the keyword ranking.
+    pub(super) fn recall_with(
+        &self,
+        question: &str,
+        limit: usize,
+        semantic: Option<&[String]>,
+    ) -> Result<RecallResult> {
         let rows = self.rows()?;
         let by_id: HashMap<&str, &Row> = rows.iter().map(|r| (r.id.as_str(), r)).collect();
         let bodies = self.bodies()?;
@@ -182,7 +196,11 @@ impl Index {
                 body: bodies.get(&r.id).map_or("", String::as_str),
             })
             .collect();
-        let ids = rank(question, &docs);
+        let keyword = rank(question, &docs);
+        let ids = match semantic {
+            Some(semantic) => fuse(&[&keyword, semantic]),
+            None => keyword,
+        };
         let labels = self.topic_labels()?;
         let annotations = self.annotations_by_note()?;
         let mut topics: Vec<String> = Vec::new();
@@ -214,6 +232,7 @@ impl Index {
         Ok(RecallResult {
             topics,
             tags: tag_counts(&rows),
+            semantic: semantic.is_some(),
         })
     }
 

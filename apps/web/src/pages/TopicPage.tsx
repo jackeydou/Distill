@@ -54,6 +54,7 @@ export function TopicPage() {
           </ul>
         </Section>
       )}
+      <Similar topic={t} />
       <Section title="合并">
         <Merge topic={t} />
       </Section>
@@ -201,5 +202,54 @@ function Merge({ topic }: { topic: TopicDetail }) {
       )}
       {merge.error && <ErrorBox error={merge.error} />}
     </div>
+  );
+}
+
+function Similar({ topic }: { topic: TopicDetail }) {
+  const session = useQuery(q.session());
+  const similar = useQuery({
+    ...q.similarTopics(topic.topic_id),
+    enabled: session.data?.embedding_model === true,
+  });
+  const navigate = useNavigate();
+  const merge = useEdit((into: string) => api.mergeTopic(topic.topic_id, { into }));
+  if (!similar.data || similar.data.length === 0) {
+    return null;
+  }
+  return (
+    <Section title="相似的 topic">
+      <ul className="border-t border-line">
+        {similar.data.map((s) => (
+          <li key={s.topic.topic_id} className="flex items-center gap-3 border-b border-line py-2">
+            <Link
+              to="/topics/$topicId"
+              params={{ topicId: s.topic.topic_id }}
+              className="min-w-0 flex-1 truncate text-ink hover:text-brand-ink"
+            >
+              {s.topic.label}
+            </Link>
+            <span className="shrink-0 text-xs text-ink-faint tabular-nums">
+              {Math.round(s.similarity * 100)}%
+            </span>
+            <AskCount count={s.ask_count} />
+            <Button
+              disabled={merge.isPending}
+              onClick={() => {
+                if (window.confirm(`把「${topic.label}」合并进「${s.topic.label}」？`)) {
+                  merge.mutate(s.topic.topic_id, {
+                    onSuccess: (merged) =>
+                      navigate({ to: "/topics/$topicId", params: { topicId: merged.topic_id } }),
+                  });
+                }
+              }}
+            >
+              <GitMerge className="size-4" aria-hidden />
+              合并进去
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {merge.error && <ErrorBox error={merge.error} />}
+    </Section>
   );
 }

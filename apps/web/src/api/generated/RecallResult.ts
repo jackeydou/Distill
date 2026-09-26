@@ -6,4 +6,8 @@ export type RecallResult = { topics: Array<RecallTopic>,
 /**
  * Every tag in use, so the agent can reuse one instead of inventing a near-duplicate.
  */
-tags: Array<TagCount>, };
+tags: Array<TagCount>, 
+/**
+ * Whether embeddings took part. False until `distill model pull` has run.
+ */
+semantic: boolean, };

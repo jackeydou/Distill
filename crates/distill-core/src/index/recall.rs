@@ -3,8 +3,9 @@
 //! A reworded question rarely shares three consecutive characters with the old one
 //! ("加载扩展" vs "加载不了扩展"), so the trigram FTS index used by search misses it.
 //! Recall instead scores every note in memory on CJK bigrams and whole words, weighted by
-//! IDF. A personal vault holds thousands of notes, which this handles in milliseconds;
-//! embeddings replace it in P4 (spec D3).
+//! IDF. A personal vault holds thousands of notes, which this handles in milliseconds.
+//! When the embedding model is installed, this ranking is fused with the semantic one
+//! (`semantic.rs`); without it, this is all recall has.
 
 use std::collections::{HashMap, HashSet};
 
@@ -64,6 +65,22 @@ pub(super) fn rank(question: &str, docs: &[Doc]) -> Vec<String> {
         .collect();
     scored.sort_by(|a, b| b.0.total_cmp(&a.0));
     scored.into_iter().map(|(_, id)| id.to_string()).collect()
+}
+
+/// Reciprocal rank fusion: each list adds `1 / (K + rank)` for the ids it holds, so an id
+/// ranked well by either keyword or embedding recall surfaces, and one ranked well by
+/// both comes first.
+pub(super) fn fuse(lists: &[&[String]]) -> Vec<String> {
+    const K: f64 = 60.0;
+    let mut scores: HashMap<&str, f64> = HashMap::new();
+    for list in lists {
+        for (rank, id) in list.iter().enumerate() {
+            *scores.entry(id).or_default() += 1.0 / (K + rank as f64 + 1.0);
+        }
+    }
+    let mut ids: Vec<(&str, f64)> = scores.into_iter().collect();
+    ids.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(b.0)));
+    ids.into_iter().map(|(id, _)| id.to_string()).collect()
 }
 
 fn is_cjk(c: char) -> bool {
@@ -144,6 +161,15 @@ mod tests {
         ];
         assert_eq!(rank("加载扩展", &docs), vec!["A"]);
         assert_eq!(rank("sqlite 扩展为什么加载失败", &docs)[0], "A");
+    }
+
+    #[test]
+    fn fusion_rewards_agreement() {
+        let s = |ids: &[&str]| ids.iter().map(|i| i.to_string()).collect::<Vec<_>>();
+        let keyword = s(&["A", "B"]);
+        let semantic = s(&["C", "B"]);
+        assert_eq!(fuse(&[&keyword, &semantic]), s(&["B", "A", "C"]));
+        assert_eq!(fuse(&[&keyword, &[]]), keyword);
     }
 
     #[test]

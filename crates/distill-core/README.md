@@ -18,7 +18,10 @@ the per-device SQLite index derived from it, and the operations that read and wr
 | `Distill::resolve_conflict` | Keep one copy of a conflicted file; move the others to `Dirs::discarded_dir` |
 | `Distill::move_vault` / `use_vault` | Copy the vault elsewhere, or switch to another vault |
 | `Distill::doctor` | Paths, installed plugin, conflicts, unreadable files |
-| `Index::recall` | Topics that resemble a question, with all their notes, annotations and every tag in use |
+| `Distill::recall` | Topics that resemble a question, with all their notes, annotations and every tag in use; keyword and embedding rankings fused when the model is installed ([docs/recall.md](../../docs/recall.md)) |
+| `Index::recall` | Keyword-only recall |
+| `Distill::duplicate_topics` / `similar_topics`, `Index::dismiss_pair` | Topic pairs that are probably one question; topics close to one topic; hide a pair |
+| `embed::Embedder` | The local embedding model: `pull`, `installed`, `load` (cached per process), `embed` |
 | `Index::search` | Keyword search, optionally filtered by tag |
 | `Index::stats` / `tags` | Counts by topic, tag, ISO week and project |
 | `Index::note_detail` / `topic_detail` / `topics` | What the web UI's note, topic and topic-list pages show |
@@ -48,8 +51,12 @@ are rejected.
 
 ## Limits
 
-- Recall ranks every note in memory on CJK bigrams and words, weighted by IDF. It is meant for
-  a personal vault of thousands of notes; embeddings replace it later.
+- Recall scores every note in memory: CJK bigrams and words weighted by IDF, plus cosine
+  similarity of 384-dimension vectors when the model is installed. It is meant for a personal
+  vault of thousands of notes.
+- The embedding model is downloaded only by `Embedder::pull` (about 0.25 GB into
+  `<data dir>/models`). Building this crate downloads ONNX Runtime (fastembed's prebuilt
+  binaries) once.
 - Search uses a trigram FTS index for pieces of three or more characters and `LIKE` for
   shorter ones.
 - The index is safe for concurrent processes (WAL, 5 s busy timeout). The vault is safe for

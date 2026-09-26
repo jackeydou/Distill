@@ -21,6 +21,9 @@ export const q = {
   note: (id: string) => queryOptions({ queryKey: ["note", id], queryFn: () => api.note(id) }),
   topics: () => queryOptions({ queryKey: ["topics"], queryFn: api.topics }),
   topic: (id: string) => queryOptions({ queryKey: ["topic", id], queryFn: () => api.topic(id) }),
+  similarTopics: (id: string) =>
+    queryOptions({ queryKey: ["similar", id], queryFn: () => api.similarTopics(id) }),
+  duplicates: () => queryOptions({ queryKey: ["duplicates"], queryFn: api.duplicates }),
   tags: () => queryOptions({ queryKey: ["tags"], queryFn: api.tags }),
   stats: () => queryOptions({ queryKey: ["stats"], queryFn: api.stats }),
   problems: () => queryOptions({ queryKey: ["problems"], queryFn: api.problems }),

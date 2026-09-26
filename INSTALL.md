@@ -71,6 +71,9 @@ distill doctor
 It should list the plugin under "Plugins" and end with "All good." Then tell the user to open a
 new session: plugins load when a session starts.
 
+Optional: `distill model pull` downloads a 0.25 GB embedding model so recall also finds
+questions asked in different words or another language. Ask the user first; it can run later.
+
 Finally, run `distill ui` once. It opens the web UI in the browser and authorizes it; links
 the agent hands out later open without asking again.
 

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, TriangleAlert } from "lucide-react";
+import { ArrowRight, GitMerge, TriangleAlert } from "lucide-react";
 import { q } from "../api/queries";
 import { NoteList } from "../components/NoteList";
 import { TopicRows } from "../components/TopicRows";
@@ -13,6 +13,8 @@ export function HomePage() {
   const stats = useQuery(q.stats());
   const recent = useQuery(q.notes({ limit: RECENT }));
   const problems = useQuery(q.problems());
+  const duplicates = useQuery(q.duplicates());
+  const duplicateCount = duplicates.data?.pairs.length ?? 0;
 
   if (stats.isPending || recent.isPending) {
     return <Loading />;
@@ -51,6 +53,17 @@ export function HomePage() {
         >
           <TriangleAlert className="size-4 shrink-0" aria-hidden />有 {problemCount}{" "}
           个文件需要处理：同步冲突或读不了的文件。
+          <ArrowRight className="ml-auto size-4" aria-hidden />
+        </Link>
+      )}
+      {duplicateCount > 0 && (
+        <Link
+          to="/topics"
+          search={{ view: "duplicates" }}
+          className="mb-8 flex items-center gap-3 rounded-panel border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-warning"
+        >
+          <GitMerge className="size-4 shrink-0" aria-hidden />
+          {duplicateCount} 对 topic 看起来是同一个问题，合并后提问次数才准。
           <ArrowRight className="ml-auto size-4" aria-hidden />
         </Link>
       )}

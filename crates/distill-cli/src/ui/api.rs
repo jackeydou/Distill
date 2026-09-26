@@ -10,10 +10,12 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use distill_core::Distill;
+use distill_core::embed::Embedder;
 use distill_core::index::{
-    Conflict, InvalidFile, NoteDetail, NoteHit, RecallResult, Stats, TagCount, TopicCount,
-    TopicDetail,
+    Conflict, InvalidFile, NoteDetail, NoteHit, RecallResult, SimilarTopic, Stats, TagCount,
+    TopicCount, TopicDetail,
 };
+use distill_core::ops::Duplicates;
 use serde::{Deserialize, Serialize};
 
 use super::server::AppState;
@@ -34,6 +36,8 @@ pub struct Session {
     pub vault: String,
     /// `http://distill.localhost:<port>`, the address links point at.
     pub origin: String,
+    /// Whether `distill model pull` has run; enables similar-topic suggestions.
+    pub embedding_model: bool,
 }
 
 #[derive(Debug, Deserialize, ts_rs::TS)]
@@ -75,6 +79,13 @@ pub struct TopicMerge {
     pub into: String,
 }
 
+#[derive(Debug, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct PairDismissal {
+    pub a: String,
+    pub b: String,
+}
+
 #[derive(Debug, Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct Merged {
@@ -106,6 +117,7 @@ pub struct ApiErrorBody {
 }
 
 const DEFAULT_LIMIT: usize = 50;
+const SIMILAR_LIMIT: usize = 5;
 const MAX_LIMIT: usize = 500;
 
 /// Routes under `/api`, all behind the session check in `server.rs`.
@@ -122,6 +134,9 @@ pub fn routes() -> Router<AppState> {
         .route("/topics", get(topics))
         .route("/topics/{id}", get(topic).put(rename_topic))
         .route("/topics/{id}/merge", post(merge_topic))
+        .route("/topics/{id}/similar", get(similar_topics))
+        .route("/duplicates", get(duplicates))
+        .route("/duplicates/dismiss", post(dismiss_duplicate))
         .route("/tags", get(tags))
         .route("/stats", get(stats))
         .route("/recall", get(recall))
@@ -143,6 +158,7 @@ async fn session(State(s): State<AppState>) -> Result<Json<Session>, ApiError> {
             version: env!("CARGO_PKG_VERSION").into(),
             vault: d.vault.root().display().to_string(),
             origin: d.config.ui_origin(),
+            embedding_model: Embedder::installed(&d.dirs),
         })
     })
     .await
@@ -243,6 +259,25 @@ async fn merge_topic(
     Ok(Json(merged))
 }
 
+async fn similar_topics(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Vec<SimilarTopic>>, ApiError> {
+    read(&s, move |d| d.similar_topics(&id, SIMILAR_LIMIT)).await
+}
+
+async fn duplicates(State(s): State<AppState>) -> Result<Json<Duplicates>, ApiError> {
+    read(&s, |d| d.duplicate_topics()).await
+}
+
+async fn dismiss_duplicate(
+    State(s): State<AppState>,
+    Json(body): Json<PairDismissal>,
+) -> Result<StatusCode, ApiError> {
+    write(&s, move |d| d.index.dismiss_pair(&body.a, &body.b)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn tags(State(s): State<AppState>) -> Result<Json<Vec<TagCount>>, ApiError> {
     read(&s, |d| d.index.tags()).await
 }
@@ -255,7 +290,7 @@ async fn recall(
     State(s): State<AppState>,
     Query(q): Query<RecallQuery>,
 ) -> Result<Json<RecallResult>, ApiError> {
-    read(&s, move |d| d.index.recall(&q.q, q.limit.unwrap_or(5))).await
+    read(&s, move |d| d.recall(&q.q, q.limit.unwrap_or(5))).await
 }
 
 async fn problems(State(s): State<AppState>) -> Result<Json<Problems>, ApiError> {

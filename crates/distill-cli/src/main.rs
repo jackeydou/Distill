@@ -11,6 +11,7 @@ use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 use distill_core::Distill;
 use distill_core::config::{Dirs, SETTABLE_KEYS};
+use distill_core::embed::{self, Embedder};
 use distill_core::ops::{InitOptions, SaveRequest, default_vault_path, expand_vault_arg, init};
 use serde::Serialize;
 
@@ -75,6 +76,9 @@ enum Command {
         #[arg(required = true, num_args = 1..)]
         text: Vec<String>,
     },
+    /// Download or inspect the local embedding model used by recall.
+    #[command(subcommand)]
+    Model(ModelCommand),
     /// Rebuild this device's index from the vault.
     Reindex,
     /// Show, switch or move the vault.
@@ -120,6 +124,14 @@ enum UiCommand {
 enum HookEvent {
     /// Reads the hook JSON on stdin and prints the context to inject.
     UserPromptSubmit,
+}
+
+#[derive(Subcommand)]
+enum ModelCommand {
+    /// Download the embedding model (about 0.25 GB) into this device's data directory.
+    Pull,
+    /// Whether the model is installed, and where.
+    Status,
 }
 
 #[derive(Subcommand)]
@@ -188,7 +200,7 @@ fn run(cli: Cli) -> Result<()> {
             emit(json, &result, render::saved)
         }
         Command::Recall { question, limit } => {
-            let result = Distill::open()?.index.recall(&question.join(" "), limit)?;
+            let result = Distill::open()?.recall(&question.join(" "), limit)?;
             emit(json, &result, render::recall)
         }
         Command::Search { query, tag, limit } => {
@@ -205,6 +217,7 @@ fn run(cli: Cli) -> Result<()> {
                 format!("Annotation saved to {}", path.display())
             })
         }
+        Command::Model(cmd) => model(cmd, json),
         Command::Reindex => {
             let mut d = Distill::open()?;
             let report = d.index.rebuild()?;
@@ -246,6 +259,39 @@ fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
     }
+}
+
+fn model(cmd: ModelCommand, json: bool) -> Result<()> {
+    let dirs = Dirs::discover()?;
+    if let ModelCommand::Pull = cmd {
+        if !json {
+            println!("Downloading {} …", embed::MODEL_REPO);
+        }
+        Embedder::pull(&dirs, !json)?;
+        // Embed the notes already in the vault now, so the first recall is fast.
+        let d = Distill::open_in(dirs.clone())?;
+        if let Some(embedder) = Embedder::load(&dirs)? {
+            d.index.embed_missing(&embedder)?;
+        }
+    }
+    let installed = Embedder::installed(&dirs);
+    let dir = Embedder::models_dir(&dirs);
+    let info = serde_json::json!({
+        "installed": installed,
+        "model": embed::MODEL_REPO,
+        "dir": dir,
+    });
+    emit(json, &info, |_| {
+        if installed {
+            format!(
+                "Embedding model {} is installed in {}.\nRecall matches reworded questions.",
+                embed::MODEL_REPO,
+                dir.display()
+            )
+        } else {
+            "The embedding model is not installed; recall uses keywords only.\nRun `distill model pull` to download it (about 0.25 GB).".into()
+        }
+    })
 }
 
 fn vault(cmd: VaultCommand, json: bool) -> Result<()> {

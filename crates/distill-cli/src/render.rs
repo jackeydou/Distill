@@ -168,6 +168,14 @@ pub fn doctor(r: &DoctorReport) -> String {
         })
         .collect::<Vec<_>>();
     out.push_str(&format!(
+        "Embedding model: {}\n",
+        if r.embedding_model {
+            "installed (recall matches reworded questions)"
+        } else {
+            "not installed; recall uses keywords only. Run `distill model pull` (about 0.25 GB)"
+        }
+    ));
+    out.push_str(&format!(
         "Plugins: {}\n",
         if plugins.is_empty() {
             "none".to_string()

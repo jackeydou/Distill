@@ -1,12 +1,15 @@
 import { bridge } from "./bridge";
 import type { AnnotationInput } from "./generated/AnnotationInput";
 import type { ConflictChoice } from "./generated/ConflictChoice";
+import type { Duplicates } from "./generated/Duplicates";
 import type { Merged } from "./generated/Merged";
 import type { NoteDetail } from "./generated/NoteDetail";
 import type { NoteHit } from "./generated/NoteHit";
 import type { NotesQuery } from "./generated/NotesQuery";
+import type { PairDismissal } from "./generated/PairDismissal";
 import type { Problems } from "./generated/Problems";
 import type { Session } from "./generated/Session";
+import type { SimilarTopic } from "./generated/SimilarTopic";
 import type { Stats } from "./generated/Stats";
 import type { TagCount } from "./generated/TagCount";
 import type { TopicCount } from "./generated/TopicCount";
@@ -42,6 +45,11 @@ export const api = {
     bridge().request<void>("PUT", `/topics/${enc(id)}`, body),
   mergeTopic: (id: string, body: TopicMerge) =>
     bridge().request<Merged>("POST", `/topics/${enc(id)}/merge`, body),
+  similarTopics: (id: string) =>
+    bridge().request<SimilarTopic[]>("GET", `/topics/${enc(id)}/similar`),
+  duplicates: () => bridge().request<Duplicates>("GET", "/duplicates"),
+  dismissDuplicate: (body: PairDismissal) =>
+    bridge().request<void>("POST", "/duplicates/dismiss", body),
   tags: () => bridge().request<TagCount[]>("GET", "/tags"),
   stats: () => bridge().request<Stats>("GET", "/stats"),
   problems: () => bridge().request<Problems>("GET", "/problems"),

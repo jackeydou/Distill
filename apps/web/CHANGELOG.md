@@ -8,5 +8,7 @@
 - Annotations can be added, edited and deleted on the note page; topics can be renamed and
   merged; sync conflicts can be settled by keeping one copy.
 - ⌘K palette over notes, topics and tags; light and dark themes following the system setting.
+- Duplicate topics: a "可能重复" view on the Topics page with merge and dismiss, a home-page
+  banner, and "相似的 topic" on topic pages. Needs `distill model pull`.
 - Pages refetch when the server reports a vault change, so notes saved from an agent appear
   without a reload.
