@@ -48,7 +48,8 @@ note         id, topic_id, title, question, conclusion, created_at, source_*, pa
 topic        id, label, merged_into?        -- 查询时解析到最终 topic
 tag / note_tag
 note_fts     FTS5
-embedding    vec0 虚表                          -- P4
+embedding    model, text_hash, vector BLOB       -- P4；没有用 vec0，见 README D3 的 2026-09-26 备注
+dismissed_pair  topic_a, topic_b                -- P4：用户标记「不是同一个问题」的 topic 对
 annotation   id, note_id, body, anchor?, created_at, updated_at, path
 conflict     id, path                           -- 同一 frontmatter id 对应多个文件
 ```
