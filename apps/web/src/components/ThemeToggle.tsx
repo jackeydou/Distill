@@ -4,6 +4,12 @@ import { cx } from "./ui";
 
 type Theme = "system" | "light" | "dark";
 const KEY = "distill-theme";
+let hostTheme: "light" | "dark" | undefined;
+
+export function setHostTheme(theme: "light" | "dark" | undefined): void {
+  hostTheme = theme;
+  applyTheme();
+}
 
 function stored(): Theme {
   const value = localStorage.getItem(KEY);
@@ -14,7 +20,10 @@ function stored(): Theme {
 export function applyTheme(theme: Theme = stored()): void {
   const dark =
     theme === "dark" ||
-    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    (theme === "system" &&
+      (hostTheme
+        ? hostTheme === "dark"
+        : window.matchMedia("(prefers-color-scheme: dark)").matches));
   document.documentElement.dataset.theme = dark ? "dark" : "light";
 }
 

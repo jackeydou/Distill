@@ -53,3 +53,6 @@ Run from the repo root with `pnpm -C apps/web <script>`, or through `mise run ch
 
 With `pnpm dev`, authorize the dev origin by opening the link `distill ui --no-open` prints
 with its host replaced by `localhost:5173`.
+
+The Codex plugin also runs this UI as an MCP App. Build outputs and transport behavior are
+documented in [docs/web-ui.md](../../docs/web-ui.md#mcp-app-transport).

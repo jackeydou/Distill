@@ -1,5 +1,21 @@
 # Bug fixes
 
+## 2026-09-30 — Codex build has no recognized branding or sidebar entrypoint
+
+**Symptom.** The installed Distill dev plugin shows no branded icon or logo and has no
+MCP sidebar UI to pin.
+**Root cause.** Brand images were packaged without manifest references. The Codex server
+exposed only four agent tools, with no UI resource or `global` entrypoint metadata.
+**Fix.** The manifest points to packaged assets. Codex launches `mcp --ui`, which advertises
+an embedded MCP App and global/thread entrypoints with SVG icons. The App reuses the UI API.
+**Guard.** `tests/plugin.rs::codex_brand_paths_resolve_and_only_codex_enables_the_app`,
+`tests/mcp.rs::ui_entrypoints_advertise_a_self_contained_app_and_icon`,
+`ui_bridge_edits_the_same_vault_and_excludes_server_control_routes`;
+`apps/web/src/api/mcp.test.ts` covers transport errors and subscription cleanup.
+**Touches.** The 2026-09-29 launcher fix: plain MCP and Claude Code retain four tools.
+The dev launcher still pins local binary and data paths; it additionally supplies the dev UI title.
+Pin preferences belong to the host and are not written by the plugin.
+
 ## 2026-09-29 — Plugin from the marketplace cannot start: binary not found
 
 **Symptom.** After installing `distill@distill` from `marketplace-claude` or

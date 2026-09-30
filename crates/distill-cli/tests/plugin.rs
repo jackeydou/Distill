@@ -122,6 +122,31 @@ fn each_output_is_a_native_marketplace() {
 }
 
 #[test]
+fn codex_brand_paths_resolve_and_only_codex_enables_the_app() {
+    let out = build(&[]);
+    let plugin = out.path().join("codex/plugins/distill");
+    let manifest = json(&plugin.join(".codex-plugin/plugin.json"));
+    for key in ["composerIcon", "logo"] {
+        let path = manifest["interface"][key].as_str().unwrap();
+        assert!(plugin.join(path).is_file(), "missing brand asset {path}");
+    }
+    assert!(
+        manifest["interface"]["capabilities"]
+            .as_array()
+            .unwrap()
+            .contains(&Value::from("Interactive"))
+    );
+    assert_eq!(
+        json(&plugin.join(".mcp.json"))["mcpServers"]["distill"]["args"],
+        serde_json::json!(["mcp", "--ui"])
+    );
+    assert_eq!(
+        json(&out.path().join("claude-code/plugins/distill/.mcp.json"))["mcpServers"]["distill"]["args"],
+        serde_json::json!(["mcp"])
+    );
+}
+
+#[test]
 fn outputs_hold_only_their_agents_files() {
     let out = build(&[]);
     let src = repo().join("plugins/distill");

@@ -2,9 +2,16 @@
   "name": "distill",
   "version": "0.0.1",
   "description": "Save what you learn in agent sessions as notes, and notice when you ask the same question again.",
-  "author": { "name": "Yanlin" },
+  "author": {
+    "name": "Yanlin"
+  },
   "license": "MIT",
-  "keywords": ["notes", "learning", "recall", "knowledge"],
+  "keywords": [
+    "notes",
+    "learning",
+    "recall",
+    "knowledge"
+  ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
@@ -12,11 +19,18 @@
     "shortDescription": "Keep what you learn from agents; notice repeat questions.",
     "developerName": "Yanlin",
     "category": "Productivity",
-    "capabilities": ["Read", "Write"],
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
     "defaultPrompt": [
       "Distill what we just figured out.",
       "Have I asked about this before?",
       "Which questions do I keep asking?"
-    ]
+    ],
+    "composerIcon": "./assets/distill-sidebar.svg",
+    "logo": "./assets/distill-flask-logo-v1.png",
+    "brandColor": "#27756C"
   }
 }

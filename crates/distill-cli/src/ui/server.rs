@@ -40,6 +40,19 @@ pub struct AppState {
 }
 
 impl AppState {
+    pub(super) fn new(dirs: Dirs, port: u16) -> Result<Self> {
+        let auth = Auth::load_or_create(&dirs.data_dir.join("ui"))?;
+        let (changes, _) = broadcast::channel(16);
+        let (shutdown, _) = watch::channel(false);
+        Ok(Self {
+            dirs,
+            auth,
+            port,
+            changes,
+            shutdown,
+        })
+    }
+
     pub fn notify_changed(&self) {
         // No receivers just means no page is open.
         let _ = self.changes.send(());
@@ -72,16 +85,7 @@ pub async fn bind(port: u16) -> std::io::Result<Bound> {
 
 /// Serves until Ctrl-C or `POST /api/shutdown`.
 pub async fn serve(bound: Bound, dirs: Dirs, vault: &Path, port: u16) -> Result<()> {
-    let auth = Auth::load_or_create(&dirs.data_dir.join("ui"))?;
-    let (changes, _) = broadcast::channel(16);
-    let (shutdown, _) = watch::channel(false);
-    let state = AppState {
-        dirs,
-        auth,
-        port,
-        changes,
-        shutdown,
-    };
+    let state = AppState::new(dirs, port)?;
     let _watcher = watch_vault(vault, state.clone())?;
     let app = router(state.clone());
 

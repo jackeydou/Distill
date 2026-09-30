@@ -8,6 +8,7 @@
 
 mod api;
 mod auth;
+mod mcp;
 mod server;
 
 use std::process::{Command, Stdio};
@@ -16,6 +17,8 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail};
 use distill_core::Distill;
 use distill_core::config::{Dirs, LocalConfig};
+
+pub(crate) use self::mcp::{McpResponse, request as mcp_request};
 
 use self::api::Health;
 use self::auth::Auth;

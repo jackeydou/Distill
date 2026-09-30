@@ -6,6 +6,7 @@ none is installed, the MCP server's launcher downloads the release the build pin
 `bin/distill-version` from GitHub releases.
 
 Install: [INSTALL.md](../../INSTALL.md). How it works: [docs/plugin.md](../../docs/plugin.md).
+For an isolated local build, use [Distill dev](../../docs/plugin.md#local-debugging).
 
 ## Contract
 

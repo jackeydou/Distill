@@ -1,8 +1,8 @@
 # The agent plugin
 
 `plugins/distill` is the source of one plugin that installs in both Codex and Claude Code. It
-has three parts: a hook that runs on every prompt, an MCP server with four tools, and the
-`distill` skill that tells the agent when to use them. Agents install a per-agent build from a
+has a prompt hook, four agent tools and the `distill` skill. The Codex build also exposes
+an MCP App with sidebar and chat entrypoints. Agents install a per-agent build from a
 marketplace branch, not the source directory. Installing it: [INSTALL.md](../INSTALL.md).
 
 ## Source layout
@@ -51,6 +51,78 @@ replaces the old source.
 
 A new file under `plugins/distill` reaches both agents unless it sits in an agent directory.
 `plugin.rs::outputs_hold_only_their_agents_files` checks the outputs against the sources.
+
+## Local debugging
+
+Run `mise run build:plugins:dev` to build the web UI, the local debug binary and the Codex
+**Distill dev** plugin. Add the output as its own marketplace:
+
+```bash
+codex plugin marketplace add dist/plugins-dev/codex
+codex plugin add distill-dev@distill-dev
+```
+
+The plugin and marketplace are both named `distill-dev`. They can be installed alongside
+`distill@distill`. Its MCP server is `distill-dev`, and its skill is `distill-dev`. The dev
+hook injects `distill-dev-source` and `distill-dev-suggest`, and directs the agent to that skill.
+
+| Path | Holds |
+|---|---|
+| `dist/plugins-dev/codex` | The generated Codex marketplace and plugin |
+| `dist/dev/config` | Dev config, including its device id and UI port |
+| `dist/dev/data` | Dev index, model, UI secret and logs |
+| `dist/dev/vault` | Dev notes, topics, tags and annotations |
+
+The launcher pins absolute paths to the checkout's debug binary and `dist/dev`, so an agent
+cache copy uses the same setup. `CARGO_TARGET_DIR` is respected at build time. It overrides
+inherited `DISTILL_HOME` and `DISTILL_VAULT`, ignores `DISTILL_BIN`, and never searches for an
+installed binary or downloads a release. A missing debug binary tells you to rebuild.
+
+On the first non-hook invocation, the launcher initializes the dev vault and sets its UI port
+to **4778**. The hook never initializes a vault. Use the launcher for commands against dev data:
+
+```bash
+dist/plugins-dev/codex/plugins/distill-dev/bin/distill-launch stats
+dist/plugins-dev/codex/plugins/distill-dev/bin/distill-launch ui
+dist/plugins-dev/codex/plugins/distill-dev/bin/distill-launch config set ui.port 4779
+```
+
+Choose another port with the last command if 4778 is occupied. The launcher ignores `PORT`;
+`ui --port` remains available. A plain `distill` command uses the regular setup.
+
+Rebuilding replaces only the marketplace output. It preserves `dist/dev/` and its port. The
+task adds a timestamp build suffix to the generated version so the host can cache each build
+separately. Source package versions stay unchanged. Run `codex plugin add distill-dev@distill-dev`
+again to install the new copy, then restart the dev MCP connection.
+
+`scripts/build-plugins.sh --dev claude-code` stages the same overlay for Claude Code after
+building the debug binary and web UI. `DISTILL_PLUGIN_OUT` overrides the marketplace output
+root without moving dev data.
+
+## Codex sidebar and chat UI
+
+The Codex manifest declares `interface.composerIcon`, `logo`, `brandColor` and the
+`Interactive` capability. Asset paths are relative to the installed plugin root. The
+composer uses `assets/distill-sidebar.svg`; the plugin page uses the flask wordmark PNG.
+
+Codex starts `distill mcp --ui`. This adds three tools to the four agent tools:
+
+| Tool | Contract |
+|---|---|
+| `distill_open_ui` | Accepts `{}`; associates `ui://distill/library.html` with `global` and `thread` entrypoints |
+| `distill_ui_read` | App-only; GET against the UI API paths |
+| `distill_ui_write` | App-only; POST, PUT or DELETE against the UI API paths |
+
+The entrypoint and server advertise a monochrome SVG icon through MCP `icons`.
+`DISTILL_DEV=1`, set by the dev launcher, titles the entrypoint **Distill dev**. The host owns
+sidebar placement and Pin controls. The plugin declares a global entrypoint; it does not set
+or persist a user's pin preference. Host behavior follows the
+[OpenAI MCP extensions specification](https://developers.openai.com/plugins/build/extensions).
+
+`resources/read` returns `text/html;profile=mcp-app` with fullscreen display metadata and
+an empty external-domain CSP. The same UI runs in the sidebar or a chat tab. Its transport
+is documented in [web-ui.md](web-ui.md#mcp-app-transport). Claude Code starts plain
+`distill mcp` and keeps its four agent tools.
 
 ## Binary releases
 

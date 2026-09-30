@@ -78,8 +78,12 @@ struct Mcp {
 
 impl Mcp {
     fn start(env: &Env) -> Self {
+        Self::start_args(env, &["mcp"])
+    }
+
+    fn start_args(env: &Env, args: &[&str]) -> Self {
         let mut child = env
-            .command(&["mcp"])
+            .command(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -341,4 +345,95 @@ fn hook_injects_source_and_points_at_the_skill() {
 
     let garbage = hook(&env, "not json", None);
     assert!(!garbage.contains("distill-source"));
+}
+
+#[test]
+fn ui_entrypoints_advertise_a_self_contained_app_and_icon() {
+    let env = Env::new();
+    let mut mcp = Mcp::start_args(&env, &["mcp", "--ui"]);
+    let tools = mcp.request("tools/list", json!({}));
+    let entry = tools["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "distill_open_ui")
+        .unwrap();
+    assert_eq!(entry["title"], "Distill");
+    assert_eq!(
+        entry["_meta"]["openai/ui"]["entrypoints"],
+        json!([{"type":"global"}, {"type":"thread"}])
+    );
+    assert_eq!(
+        entry["_meta"]["ui"]["resourceUri"],
+        "ui://distill/library.html"
+    );
+    assert!(
+        entry["icons"][0]["src"]
+            .as_str()
+            .unwrap()
+            .starts_with("data:image/svg+xml;base64,")
+    );
+    let (err, result) = mcp.call("distill_open_ui", json!({}));
+    assert!(!err, "{result}");
+    assert_eq!(result["status"], 200);
+    assert_eq!(
+        result["data"]["vault"],
+        env.dir.path().join("vault").to_str().unwrap()
+    );
+    let list = mcp.request("resources/list", json!({}));
+    let uri = list["resources"][0]["uri"].as_str().unwrap();
+    let resource = mcp.request("resources/read", json!({"uri": uri}));
+    let content = &resource["contents"][0];
+    assert_eq!(content["mimeType"], "text/html;profile=mcp-app");
+    assert_eq!(content["_meta"]["ui"]["csp"]["resourceDomains"], json!([]));
+    assert_eq!(
+        content["_meta"]["openai/ui"]["preferredDisplayMode"],
+        "fullscreen"
+    );
+    let html = content["text"].as_str().unwrap();
+    assert!(html.contains("data-transport=\"mcp\""));
+    assert!(html.contains("data:font/"), "fonts must be embedded");
+    assert!(!html.contains("src=\"/assets/"));
+    for name in ["distill_ui_read", "distill_ui_write"] {
+        let tool = tools["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["name"] == name)
+            .unwrap();
+        assert_eq!(tool["_meta"]["ui"]["visibility"], json!(["app"]));
+    }
+}
+
+#[test]
+fn ui_bridge_edits_the_same_vault_and_excludes_server_control_routes() {
+    let env = Env::new();
+    let mut mcp = Mcp::start_args(&env, &["mcp", "--ui"]);
+    let (_, saved) = mcp.call("distill_save", save_args("new", SESSION));
+    let id = saved["note_id"].as_str().unwrap();
+    let (_, result) = mcp.call("distill_ui_write", json!({"method":"POST", "path":format!("/notes/{id}/annotations"), "body":{"text":"Through MCP App"}}));
+    assert_eq!(result["status"], 200, "{result}");
+    let annotation = result["data"]["note"]["annotations"][0]["id"]
+        .as_str()
+        .unwrap();
+    let (_, note) = mcp.call("distill_ui_read", json!({"path":format!("/notes/{id}")}));
+    assert_eq!(
+        note["data"]["note"]["annotations"][0]["body"],
+        "Through MCP App"
+    );
+    let (_, deleted) = mcp.call(
+        "distill_ui_write",
+        json!({"method":"DELETE", "path":format!("/annotations/{annotation}")}),
+    );
+    assert_eq!(deleted["status"], 204);
+    for path in ["/shutdown", "/auth", "/events"] {
+        let (_, result) = mcp.call("distill_ui_read", json!({"path":path}));
+        assert_eq!(result["status"], 404, "{path}: {result}");
+    }
+    for path in ["https://example.com/notes", "//example.com/notes", "notes"] {
+        let (error, _) = mcp.call("distill_ui_read", json!({"path":path}));
+        assert!(error, "{path} must not cross the API boundary");
+    }
+    let (_, result) = mcp.call("distill_ui_write", json!({"method":"POST","path":"/stats"}));
+    assert_eq!(result["status"], 405);
 }

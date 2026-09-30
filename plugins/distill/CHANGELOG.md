@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- Codex branding paths now resolve to the packaged SVG icon and flask wordmark logo.
+- Codex MCP App with global sidebar and thread entrypoints; Distill dev has its own entry title.
+- `mise run build:plugins:dev` builds **Distill dev** for Codex in `dist/plugins-dev/codex`.
+  Its `distill-dev` marketplace, MCP server and skill are separate from the regular plugin.
+  The launcher uses the checkout's debug binary and keeps config, index and vault in `dist/dev/`.
+- Round flask brand assets in `codex/assets/`: a teal and gold icon, a Distill wordmark,
+  and a transparent black outline icon for the Codex sidebar.
+- Transparent icon concepts in `codex/assets/`, including stacked bookmarks.
 - When no `distill` is installed, `bin/distill-launch` downloads the release pinned in
   `bin/distill-version` from GitHub releases, checks its SHA-256, and keeps it under
   `<data dir>/bin/<version>/`. Only the MCP server downloads; the hook still exits 0 at once.
@@ -22,4 +30,3 @@
   annotations at the note's page.
 - Marketplace branches `marketplace-codex` and `marketplace-claude`, published by CI on every
   push to `main`. Published versions carry a build suffix such as `0.0.1+codex.<commit>`.
-

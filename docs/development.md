@@ -17,6 +17,7 @@ and a production build for `apps/web`. A change is not done until it passes.
 |---|---|
 | `mise run web:build` | Builds `apps/web/dist` |
 | `mise run install` | Builds the web UI, then `cargo install --path crates/distill-cli --locked` |
+| `mise run build:plugins:dev` | Builds the web UI, debug binary and isolated Distill dev marketplace for Codex ([local debugging](plugin.md#local-debugging)) |
 | `mise run fmt` | Formats Rust and web code |
 
 ## Layout

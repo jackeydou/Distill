@@ -6,14 +6,14 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { ApiError } from "./bridge";
+import { ApiError, bridge } from "./bridge";
 import { api } from "./client";
 import type { NotesQuery } from "./generated/NotesQuery";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Freshness comes from the server's change events, not from polling.
+      // The transport owns refresh notifications.
       staleTime: Number.POSITIVE_INFINITY,
       retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 2,
     },
@@ -49,14 +49,10 @@ export function useVaultEvents(enabled: boolean): void {
     if (!enabled) {
       return;
     }
-    const events = new EventSource("/api/events");
     const refresh = () => {
       void client.invalidateQueries({ predicate: (query) => query.queryKey[0] !== "session" });
     };
-    events.addEventListener("changed", refresh);
-    // After a reconnect (server restarted), anything may have changed.
-    events.addEventListener("open", refresh);
-    return () => events.close();
+    return bridge().subscribe(refresh);
   }, [client, enabled]);
 }
 

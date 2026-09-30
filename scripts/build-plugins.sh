@@ -4,9 +4,11 @@
 # branches; locally, add an output with `claude plugin marketplace add dist/plugins/claude-code`
 # or `codex plugin marketplace add dist/plugins/codex`.
 #
-# Usage: scripts/build-plugins.sh [--build <id>] [claude-code | codex]...   (no agent: both)
+# Usage: scripts/build-plugins.sh [--dev] [--build <id>] [claude-code | codex]...
 #   --build <id>  Sets the output manifest version to <version>+<agent>.<id>, so agents that
 #                 cache plugins by version pick up a new build. Needs jq.
+#   --dev         Builds distill-dev under dist/plugins-dev, using the local debug binary
+#                 and dist/dev for config, index and vault. Needs jq and cargo.
 # Output goes to $DISTILL_PLUGIN_OUT/<agent> (default dist/plugins/<agent>), replaced on each run.
 #
 # Sources, all copied as is:
@@ -27,10 +29,23 @@ distill_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' "$root/Cargo.toml" | head
 [ -n "$distill_version" ] || { echo "build-plugins: no version in $root/Cargo.toml" >&2; exit 2; }
 
 build_id=""
-if [ "${1:-}" = "--build" ]; then
-  build_id="${2:?--build needs an id, such as a commit hash}"
-  shift 2
-  command -v jq >/dev/null || { echo "build-plugins: --build needs jq on PATH" >&2; exit 2; }
+dev=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dev) dev=true; shift ;;
+    --build) build_id="${2:?--build needs an id, such as a commit hash}"; shift 2 ;;
+    *) break ;;
+  esac
+done
+if [ -n "$build_id" ] || "$dev"; then
+  command -v jq >/dev/null || { echo "build-plugins: --build and --dev need jq on PATH" >&2; exit 2; }
+fi
+plugin_name=distill
+if "$dev"; then
+  plugin_name=distill-dev
+  out="${DISTILL_PLUGIN_OUT:-$root/dist/plugins-dev}"
+  dev_home="$root/dist/dev"
+  dev_binary=$(cargo metadata --manifest-path "$root/Cargo.toml" --no-deps --format-version 1 | jq -er '.target_directory + "/debug/distill"')
 fi
 
 build() { # <agent>
@@ -39,7 +54,7 @@ build() { # <agent>
     codex) manifest=".codex-plugin/plugin.json" ;;
   esac
   dest="$out/$1"
-  plugin="$dest/plugins/distill"
+  plugin="$dest/plugins/$plugin_name"
   rm -rf "$dest"
   mkdir -p "$plugin"
   for f in $shared; do
@@ -48,6 +63,9 @@ build() { # <agent>
   cp -Rp "$src/$1/." "$plugin/"
   echo "$distill_version" >"$plugin/bin/distill-version"
   cp -Rp "$root/packaging/$1/." "$dest/"
+  if "$dev"; then
+    "$root/scripts/build-dev-plugin.sh" "$1" "$dest" "$dev_home" "$dev_binary"
+  fi
   if [ -n "$build_id" ]; then
     jq --arg id "$1.$build_id" '.version += "+" + $id' "$plugin/$manifest" >"$plugin/$manifest.tmp"
     mv "$plugin/$manifest.tmp" "$plugin/$manifest"

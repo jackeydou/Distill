@@ -37,7 +37,7 @@ existing vault.
 | `doctor` | Paths, plugin install, conflicts, unreadable files; exits non-zero when something needs attention |
 | `ui [--no-open] [--port <port>]` | Start the web UI and open an authorized browser tab ([docs/web-ui.md](../../docs/web-ui.md)) |
 | `ui stop` | Stop the running web UI |
-| `mcp` | Stdio MCP server for the plugin ([docs/plugin.md](../../docs/plugin.md)) |
+| `mcp [--ui]` | Stdio MCP server; `--ui` adds the embedded MCP App for the plugin ([docs/plugin.md](../../docs/plugin.md)) |
 | `hook user-prompt-submit` | Hook entry point for the plugin; always exits 0 |
 
 The `SaveRequest` fields and tag rules are in the

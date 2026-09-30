@@ -1,10 +1,10 @@
-// The one place the UI talks to `distill ui`. Tests swap in a fake with `setBridge`; a
-// future desktop shell would swap in its own transport (spec D7).
+// HTTP and MCP transports share the same API paths and response types.
 
 export type Method = "GET" | "POST" | "PUT" | "DELETE";
 
 export interface Bridge {
   request<T>(method: Method, path: string, body?: unknown): Promise<T>;
+  subscribe(refresh: () => void): () => void;
 }
 
 /** An API response that was not 2xx. `message` is the server's `error` text. */
@@ -19,6 +19,12 @@ export class ApiError extends Error {
 }
 
 export const httpBridge: Bridge = {
+  subscribe(refresh) {
+    const events = new EventSource("/api/events");
+    events.addEventListener("changed", refresh);
+    events.addEventListener("open", refresh);
+    return () => events.close();
+  },
   async request<T>(method: Method, path: string, body?: unknown): Promise<T> {
     const res = await fetch(`/api${path}`, {
       method,
