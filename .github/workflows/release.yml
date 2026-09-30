@@ -3,10 +3,12 @@ name: Release
 # Pushing a tag `v<version>` builds `distill` for each target and publishes a GitHub release
 # holding `distill-<target>.tar.gz` and `distill-<target>.tar.gz.sha256`. The plugin launcher
 # downloads from these URLs, so the asset names are a contract; see docs/plugin.md.
+# A manual run builds every target without publishing, to test the build before tagging.
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,11 +23,12 @@ jobs:
         include:
           - target: aarch64-apple-darwin
             os: macos-15
-          # The oldest supported runner, so the binary needs the oldest glibc we can offer.
+          # ort-sys's prebuilt ONNX Runtime needs glibc 2.38 and GCC 14's libstdc++ to link;
+          # Ubuntu 22.04 has neither. Binaries built here need glibc 2.39.
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-22.04
+            os: ubuntu-24.04
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-22.04-arm
+            os: ubuntu-24.04-arm
     runs-on: ${{ matrix.os }}
     env:
       TARGET: ${{ matrix.target }}
@@ -33,6 +36,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Tag matches the workspace version
+        if: github.ref_type == 'tag'
         run: |
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
           if [ "$GITHUB_REF_NAME" != "v$version" ]; then
@@ -69,6 +73,7 @@ jobs:
 
   publish:
     needs: build
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       contents: write

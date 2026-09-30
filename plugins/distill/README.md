@@ -19,6 +19,7 @@ Install: [INSTALL.md](../../INSTALL.md). How it works: [docs/plugin.md](../../do
 ## Limits
 
 - `bin/distill-launch` is a POSIX shell script; Windows is not handled yet.
-- Downloads cover Apple Silicon Macs and Linux with glibc (arm64, x86_64), and need `curl`.
+- Downloads cover Apple Silicon Macs and Linux with glibc 2.39 or later (arm64, x86_64), and need
+  `curl`.
   Intel Macs are not supported at all; elsewhere, install `distill` yourself.
 - In Claude Code the skill is invoked as `/distill:distill`; in Codex, ask for it by name.

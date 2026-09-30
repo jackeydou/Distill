@@ -54,7 +54,8 @@ A new file under `plugins/distill` reaches both agents unless it sits in an agen
 
 ## Binary releases
 
-Pushing a tag `v<version>` runs [the release workflow](../.github/workflows/release.yml). It
+Pushing a tag `v<version>` runs [the release workflow](../.github/workflows/release.yml). Running
+it by hand (`gh workflow run release.yml`) builds every target without publishing. It
 fails unless `<version>` equals the `version` in the root `Cargo.toml`. It builds `distill`
 with the web UI embedded and publishes a GitHub release with two assets per target:
 `distill-<target>.tar.gz`, holding one file named `distill`, and
@@ -63,8 +64,8 @@ with the web UI embedded and publishes a GitHub release with two assets per targ
 | Target | Built on |
 |---|---|
 | `aarch64-apple-darwin` | `macos-15` |
-| `x86_64-unknown-linux-gnu` | `ubuntu-22.04` (glibc 2.35) |
-| `aarch64-unknown-linux-gnu` | `ubuntu-22.04-arm` |
+| `x86_64-unknown-linux-gnu` | `ubuntu-24.04`; needs glibc 2.39 |
+| `aarch64-unknown-linux-gnu` | `ubuntu-24.04-arm`; needs glibc 2.39 |
 
 A published plugin pins the release named in its `bin/distill-version`. Until a release with
 that tag exists, launchers without an installed `distill` fail with the download error.
