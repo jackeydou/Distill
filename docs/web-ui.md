@@ -54,6 +54,23 @@ notes or links, since the vault syncs. The CLI sends the secret as `Authorizatio
 A browser without the cookie gets 401 from the API; the page then tells the user to run
 `distill ui`.
 
+## MCP App transport
+
+`mise run web:build` builds the HTTP UI into `apps/web/dist` and the MCP App into
+`apps/web/dist-mcp/mcp.html`. The latter embeds JavaScript, CSS and fonts in one file.
+Rebuild the binary after building either UI to embed it in a release.
+
+The MCP App connects to the host with `@modelcontextprotocol/ext-apps`. Its API bridge calls
+`distill_ui_read` and `distill_ui_write`. The server dispatches these requests to the same
+Axum handlers as HTTP, in process. It does not pass a UI secret to the iframe or require a
+running HTTP server. Only business API routes are available; `/auth`, `/events` and
+`/shutdown` are excluded. HTTP security and authentication stay as described above.
+
+The App uses memory navigation because its resource URI is not a browser route. System theme
+follows the host theme when supplied. It refreshes visible pages every five seconds and on
+focus; the HTTP UI continues using server-sent events. Editing a note's annotation or topic
+updates the same vault files through either transport.
+
 ## API
 
 JSON over HTTP. Request and response types are Rust types in

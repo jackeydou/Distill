@@ -92,7 +92,11 @@ enum Command {
     /// Open the web UI in a browser, starting its local server if needed.
     Ui(UiArgs),
     /// Run the MCP server on stdio. Started by the Distill plugin, one per agent session.
-    Mcp,
+    Mcp {
+        /// Expose the embedded MCP App and Codex sidebar entrypoints.
+        #[arg(long)]
+        ui: bool,
+    },
     /// Hook entry points. Run by the Distill plugin; always exit 0.
     #[command(subcommand)]
     Hook(HookEvent),
@@ -242,10 +246,10 @@ fn run(cli: Cli) -> Result<()> {
                 open_browser: !args.no_open,
             }),
         },
-        Command::Mcp => tokio::runtime::Builder::new_current_thread()
+        Command::Mcp { ui } => tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?
-            .block_on(mcp::serve()),
+            .block_on(mcp::serve(ui)),
         Command::Hook(HookEvent::UserPromptSubmit) => {
             hook::user_prompt_submit();
             Ok(())

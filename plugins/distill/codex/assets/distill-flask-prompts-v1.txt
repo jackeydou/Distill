@@ -1,0 +1,32 @@
+Generated with the built-in image_gen tool.
+
+ICON
+Use case: logo-brand
+Asset type: standalone Distill Codex plugin icon, square transparent PNG.
+Primary request: A thoughtfully designed minimal flat brand symbol: a round spherical laboratory flask with liquid bubbling into stars. Color is a restrained accent, not a rainbow effect.
+Style: clean 2D vector-like logo, precise simple geometry, consistent dark charcoal outlines with rounded joins. Editorial and quietly playful, handsome and restrained. ABSOLUTELY NO GRADIENTS, NO 3D, NO GLOSS, NO LIGHTING, NO SHADOWS, NO NEON, NO GLOW.
+Subject: true circular flask bulb, short straight narrow neck, simple open lip. One gently curved liquid surface across the lower half of the bulb, a single solid muted teal fill (#4EAAA0). The transparent empty upper half contains one small outline bubble and one small four-point star that rises from the liquid. A second four-point star in solid warm golden ochre (#E5B34C) just above the flask mouth. Dark charcoal (#23272A) outline. Only these two accent colors. All glass interior is transparent, including the air and any unfilled portions. No white fill anywhere.
+Composition: one compact centered mark, ample clear margins, simple recognizable silhouette readable at 32px. Round body visually dominant, short neck, no exaggerated elongated neck. Minimal details.
+Text: none.
+Constraints: genuinely transparent alpha background. No badge or rounded-square background, no extra decoration, no watermark. Star count exactly two, one small inside the bulb/neck and one above the mouth. The liquid looks like liquid in a flask, not ocean waves.
+
+LOGO
+Use case: logo-brand
+Asset type: horizontal Distill wordmark with flask icon, transparent PNG.
+Reference image 1: the brand icon. Preserve its exact shape and restrained style.
+Primary request: Put this spherical laboratory flask icon on the left, with the exact word "Distill" on the right, in a refined medium-bold rounded geometric sans serif.
+Text (verbatim): "Distill" (capital D, lowercase i s t i l l), dark charcoal #23272A, ONE SOLID COLOR.
+Flask: dark charcoal even rounded outlines, lower half filled with one solid muted teal #4EAAA0, one golden ochre four-point star above the mouth, one tiny teal four-point star and one outlined bubble inside. Keep the reference geometry, no new objects.
+Composition: horizontal 3:1 canvas, icon roughly one quarter of width, word visually balanced against the flask body, generous clear gap and outer margins. One final lockup, no variants.
+Style: clean flat 2D vector-like branding, every region one SOLID FLAT COLOR. No gradients anywhere, no rainbow letters, no glows, no gloss, no bevel, no 3D, no shading, no shadows or texture.
+Background: genuine transparent alpha, also transparent inside glass except teal liquid; no white fill, no fake checkerboard.
+Avoid: slogans, captions, badge, watermark, extra text, background.
+
+SIDEBAR
+Use case: logo-brand
+Asset type: Codex sidebar small icon, pure black line art on genuinely transparent alpha background.
+Input image 1: brand flask shape reference; simplify it into monochrome line art.
+Primary request: The same spherical round-bottom laboratory flask with liquid bubbling into two four-point stars, drawn ONLY with clean pure black #000000 outlines.
+Composition: square centered icon, circular bulb, short narrow upright neck and simple open lip. One curved line across the lower half indicates the liquid level. One small four-point star outline inside the bulb above the liquid. One four-point star outline just above the mouth. Remove the round bubble for clarity at 20–24px.
+Style: minimal clean vector-like outline icon, a consistent medium stroke weight, rounded caps and joins, strong silhouette, no tiny detail. Keep every line bold enough for a small sidebar icon.
+Constraints: black strokes only. ALL interiors genuinely transparent including the liquid region and inside the stars, no solid fills anywhere. NO WHITE, NO GRAY, NO COLOR, NO GRADIENTS, NO SHADING, NO SHADOW, NO GLOW, NO 3D, NO TEXTURE. No wordmark or text. No background tile, no fake transparency checkerboard. Comfortable 12% margins, no clipping.

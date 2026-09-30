@@ -9,6 +9,8 @@
   notes, topics, tags and stats pages are gone; their content moved into these two.
 
 ### Added
+- MCP App build with embedded fonts and an SDK bridge to the existing UI API. The same
+  notes, Review and annotation pages run inside the host, with memory navigation and host theme.
 - Web UI served by `distill ui`: home, notes search, note page, topics with timelines, tags,
   stats and a problems page. See `README.md`.
 - Annotations can be added, edited and deleted on the note page; topics can be renamed and

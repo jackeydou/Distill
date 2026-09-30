@@ -8,6 +8,8 @@
   running binary, otherwise the binary's quoted path, as for a copy the plugin downloaded.
 
 ### Added
+- `distill mcp --ui`: embedded MCP App, global/thread entrypoints, monochrome icon and
+  app-only read/write tools over the existing UI API. Plain `mcp` keeps four agent tools.
 - `distill` commands: `init`, `save`, `recall`, `search`, `stats`, `tags`, `annotate`,
   `reindex`, `vault show|use|move`, `config list|get|set`, `doctor`. All accept `--json`.
 - `init` proposes iCloud Drive on macOS or the documents folder elsewhere, accepts `~/…` and

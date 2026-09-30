@@ -5,6 +5,8 @@
 //! Validation failures come back as tool errors with the message the agent needs to retry;
 //! only transport problems are protocol errors.
 
+mod app;
+
 use std::path::Path;
 
 use distill_core::Distill;
@@ -47,15 +49,27 @@ pub struct SearchParams {
 }
 
 pub struct DistillServer {
-    #[expect(dead_code, reason = "read by the code #[tool_handler] generates")]
+    ui_enabled: bool,
     tool_router: ToolRouter<Self>,
 }
 
 #[tool_router]
 impl DistillServer {
-    pub fn new() -> Self {
+    pub fn new(ui_enabled: bool) -> Self {
+        let mut tool_router = Self::tool_router();
+        if ui_enabled {
+            let mut ui_router = Self::ui_router();
+            let entry = ui_router
+                .map
+                .get_mut("distill_open_ui")
+                .expect("UI entrypoint exists");
+            entry.attr.title = Some(app::title().into());
+            entry.attr.icons = Some(vec![app::icon()]);
+            tool_router += ui_router;
+        }
         Self {
-            tool_router: Self::tool_router(),
+            ui_enabled,
+            tool_router,
         }
     }
 
@@ -162,21 +176,55 @@ impl DistillServer {
 
 impl Default for DistillServer {
     fn default() -> Self {
-        Self::new()
+        Self::new(false)
     }
 }
 
-#[tool_handler]
+#[tool_handler(router = self.tool_router)]
 impl ServerHandler for DistillServer {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
-            .with_server_info(Implementation::new("distill", env!("CARGO_PKG_VERSION")))
-            .with_instructions(INSTRUCTIONS)
+        let capabilities = if self.ui_enabled {
+            ServerCapabilities::builder()
+                .enable_tools()
+                .enable_resources()
+                .build()
+        } else {
+            ServerCapabilities::builder().enable_tools().build()
+        };
+        ServerConfig::new(capabilities)
+            .with_server_info(Implementation::new("distill", env!("CARGO_PKG_VERSION"))
+                .with_title(app::title()).with_icons(vec![app::icon()]))
+            .with_instructions(if std::env::var_os("DISTILL_DEV").is_some() {
+                "Distill dev uses an isolated local vault. Read the distill-dev skill and use only this server for dev context."
+            } else { INSTRUCTIONS })
+    }
+    async fn list_resources(
+        &self,
+        _: Option<rmcp::model::PaginatedRequestParams>,
+        _: rmcp::service::RequestContext<rmcp::RoleServer>,
+    ) -> Result<rmcp::model::ListResourcesResult, McpError> {
+        Ok(rmcp::model::ListResourcesResult::with_all_items(
+            if self.ui_enabled {
+                vec![app::resource()]
+            } else {
+                vec![]
+            },
+        ))
+    }
+
+    async fn read_resource(
+        &self,
+        request: rmcp::model::ReadResourceRequestParams,
+        _: rmcp::service::RequestContext<rmcp::RoleServer>,
+    ) -> Result<rmcp::model::ReadResourceResponse, McpError> {
+        app::read_resource(&request.uri, self.ui_enabled).map(Into::into)
     }
 }
 
-pub async fn serve() -> anyhow::Result<()> {
-    let service = DistillServer::new().serve(rmcp::transport::stdio()).await?;
+pub async fn serve(ui_enabled: bool) -> anyhow::Result<()> {
+    let service = DistillServer::new(ui_enabled)
+        .serve(rmcp::transport::stdio())
+        .await?;
     service.waiting().await?;
     Ok(())
 }

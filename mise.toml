@@ -13,13 +13,13 @@ description = "Install the web UI's dependencies"
 run = "pnpm install --frozen-lockfile"
 
 [tasks."web:build"]
-description = "Build the web UI into apps/web/dist, which `distill` embeds"
+description = "Build the HTTP and MCP web UIs, which distill embeds"
 depends = ["web:install"]
 run = "pnpm -C apps/web build"
 
 [tasks.check]
 description = "Everything a change must pass before it is done"
-depends = ["web:install"]
+depends = ["web:build"]
 # cargo test regenerates the ts-rs API types before the web checks read them.
 run = [
   "cargo fmt --all --check",
@@ -28,7 +28,6 @@ run = [
   "pnpm -C apps/web lint",
   "pnpm -C apps/web typecheck",
   "pnpm -C apps/web test",
-  "pnpm -C apps/web build",
 ]
 
 [tasks.install]
@@ -39,3 +38,8 @@ run = "cargo install --path crates/distill-cli --locked"
 [tasks."build:plugins"]
 description = "Build per-agent plugin directories under dist/plugins (args: claude-code, codex)"
 run = "scripts/build-plugins.sh"
+
+[tasks."build:plugins:dev"]
+description = "Build Distill dev for Codex with the local debug binary and an isolated vault"
+depends = ["web:build"]
+run = ["cargo build -p distill-cli", 'scripts/build-plugins.sh --dev --build "dev.$(date +%Y%m%d%H%M%S)" codex']

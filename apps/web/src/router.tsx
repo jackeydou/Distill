@@ -1,4 +1,9 @@
-import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
 import { Layout } from "./components/Layout";
 import { Empty } from "./components/ui";
 import { DistillPage } from "./pages/DistillPage";
@@ -27,7 +32,13 @@ const routeTree = root.addChildren([
   createRoute({ getParentRoute: () => root, path: "/problems", component: ProblemsPage }),
 ]);
 
-export const router = createRouter({ routeTree, scrollRestoration: true });
+export const router = createRouter({
+  routeTree,
+  scrollRestoration: true,
+  ...(document.documentElement.dataset.transport === "mcp"
+    ? { history: createMemoryHistory({ initialEntries: ["/"] }) }
+    : {}),
+});
 
 declare module "@tanstack/react-router" {
   interface Register {
