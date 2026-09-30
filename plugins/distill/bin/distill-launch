@@ -3,11 +3,17 @@
 #
 # Desktop apps often start hooks and MCP servers with a PATH that lacks ~/.cargo/bin or
 # /opt/homebrew/bin, so this looks in order at: $DISTILL_BIN, the path `distill init`
-# recorded in the config, PATH, and common install locations.
+# recorded in the config, PATH, common install locations, and the copy this launcher
+# downloads. When none exists, it downloads the release named in `distill-version` (written
+# next to this script by scripts/build-plugins.sh) into the data directory.
 #
-# The hook must never block the user's prompt: when distill is missing, `hook` exits 0.
+# The hook must never block the user's prompt: when distill is missing, `hook` exits 0
+# without downloading. The MCP server starts with the session and does the download.
+# Nothing may go to stdout except the binary's own output: it is the MCP transport.
 
 set -u
+
+here=$(cd "$(dirname "$0")" && pwd)
 
 config_file() {
   if [ -n "${DISTILL_HOME:-}" ]; then
@@ -20,6 +26,20 @@ config_file() {
   esac
 }
 
+# Same directory as `Dirs::data_dir` in distill-core.
+data_dir() {
+  if [ -n "${DISTILL_HOME:-}" ]; then
+    echo "$DISTILL_HOME/data"
+    return
+  fi
+  case "$(uname -s)" in
+    Darwin) echo "$HOME/Library/Application Support/Distill" ;;
+    *) echo "${XDG_DATA_HOME:-$HOME/.local/share}/distill" ;;
+  esac
+}
+
+managed="$(data_dir)/bin"
+
 bin=""
 try() {
   if [ -z "$bin" ] && [ -n "$1" ] && [ -x "$1" ]; then
@@ -30,19 +50,74 @@ try() {
 try "${DISTILL_BIN:-}"
 config=$(config_file)
 if [ -f "$config" ]; then
-  try "$(sed -n 's/^bin_path = "\(.*\)"$/\1/p' "$config" | head -n 1)"
+  recorded=$(sed -n 's/^bin_path = "\(.*\)"$/\1/p' "$config" | head -n 1)
+  # A recorded download may be an older release than this plugin pins; the pinned one wins.
+  case "$recorded" in
+    "$managed"/*) ;;
+    *) try "$recorded" ;;
+  esac
 fi
 try "$(command -v distill 2>/dev/null || true)"
 for candidate in "$HOME/.cargo/bin/distill" /opt/homebrew/bin/distill /usr/local/bin/distill "$HOME/.local/bin/distill"; do
   try "$candidate"
 done
 
+fail() {
+  echo "distill: $1" >&2
+  exit 127
+}
+
+sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d ' ' -f 1
+  else
+    shasum -a 256 "$1" | cut -d ' ' -f 1
+  fi
+}
+
+# Downloads release $version into $managed/$version. Concurrent sessions may race here; each
+# unpacks into its own temporary directory and the last `mv` wins with an identical file.
+download() {
+  case "$(uname -s)/$(uname -m)" in
+    Darwin/arm64) target=aarch64-apple-darwin ;;
+    Darwin/x86_64) target=x86_64-apple-darwin ;;
+    Linux/x86_64) target=x86_64-unknown-linux-gnu ;;
+    Linux/aarch64 | Linux/arm64) target=aarch64-unknown-linux-gnu ;;
+    *) fail "no prebuilt binary for $(uname -s) $(uname -m). Build it from source (see INSTALL.md) or set DISTILL_BIN." ;;
+  esac
+  command -v curl >/dev/null 2>&1 || fail "curl is needed to download distill $version. Install curl, or install distill yourself (see INSTALL.md)."
+  base="${DISTILL_RELEASES_URL:-https://github.com/jackeydou/Distill/releases/download}"
+  url="$base/v$version/distill-$target.tar.gz"
+  dest="$managed/$version"
+  mkdir -p "$dest" || fail "could not create $dest. Set DISTILL_BIN to an installed distill instead."
+  tmp=$(mktemp -d "$dest/.download.XXXXXX") || fail "could not create a temporary directory in $dest."
+  trap 'rm -rf "$tmp"' EXIT
+  echo "distill: downloading distill $version for $target from $url" >&2
+  curl -fsSL --retry 2 -o "$tmp/distill.tar.gz" "$url" \
+    || fail "download of $url failed. Check the network and that release v$version exists, or install distill yourself (see INSTALL.md)."
+  curl -fsSL --retry 2 -o "$tmp/distill.tar.gz.sha256" "$url.sha256" \
+    || fail "download of $url.sha256 failed. Check the network and that release v$version exists."
+  expected=$(cut -d ' ' -f 1 <"$tmp/distill.tar.gz.sha256")
+  actual=$(sha256 "$tmp/distill.tar.gz")
+  [ -n "$expected" ] && [ "$expected" = "$actual" ] \
+    || fail "checksum mismatch for $url: expected ${expected:-nothing}, got $actual. Nothing was installed; try again."
+  tar -xzf "$tmp/distill.tar.gz" -C "$tmp" distill \
+    || fail "$url does not contain a \`distill\` binary."
+  chmod +x "$tmp/distill"
+  mv -f "$tmp/distill" "$dest/distill" || fail "could not move distill into $dest."
+  rm -rf "$tmp"
+  trap - EXIT
+}
+
 if [ -z "$bin" ]; then
   if [ "${1:-}" = "hook" ]; then
     exit 0
   fi
-  echo "distill: binary not found. Install it (see INSTALL.md), run \`distill init\`, or set DISTILL_BIN." >&2
-  exit 127
+  [ -f "$here/distill-version" ] \
+    || fail "binary not found, and this plugin copy names no release to download ($here/distill-version is missing). Install distill (see INSTALL.md) or set DISTILL_BIN."
+  version=$(cat "$here/distill-version")
+  [ -x "$managed/$version/distill" ] || download
+  bin="$managed/$version/distill"
 fi
 
 exec "$bin" "$@"
