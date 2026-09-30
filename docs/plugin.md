@@ -27,7 +27,9 @@ sets never meet in one directory. Both marketplaces are named `distill`, so the 
 plugin at `plugins/distill` made of `bin/`, `skills/` and the contents of
 `plugins/distill/<agent>/`. Pass `claude-code` or `codex` to build one; `DISTILL_PLUGIN_OUT`
 changes the output root. `--build <id>` sets the output version to `<version>+<agent>.<id>`
-and needs `jq`. The `distill` binary is not included; it ships separately.
+and needs `jq`. The build also writes `bin/distill-version`: the `version` from the root
+`Cargo.toml`, which names the release the launcher downloads. The `distill` binary itself is
+not in the build.
 
 On every push to `main`, [CI](../.github/workflows/ci.yml) runs `mise run check`, then builds
 each agent and commits the output to its branch:
@@ -38,7 +40,7 @@ each agent and commits the output to its branch:
 | `marketplace-claude` | `dist/plugins/claude-code` |
 
 The build id is the first 12 characters of the last commit that touched `plugins/distill`,
-`packaging` or the build script. The published version changes only when the plugin does, and
+`packaging`, the build script or the root `Cargo.toml`. The published version changes only when the plugin does, and
 a push that leaves the plugin unchanged commits nothing.
 
 To try local changes, build and add the output as a local marketplace:
@@ -50,13 +52,47 @@ replaces the old source.
 A new file under `plugins/distill` reaches both agents unless it sits in an agent directory.
 `plugin.rs::outputs_hold_only_their_agents_files` checks the outputs against the sources.
 
+## Binary releases
+
+Pushing a tag `v<version>` runs [the release workflow](../.github/workflows/release.yml). It
+fails unless `<version>` equals the `version` in the root `Cargo.toml`. It builds `distill`
+with the web UI embedded and publishes a GitHub release with two assets per target:
+`distill-<target>.tar.gz`, holding one file named `distill`, and
+`distill-<target>.tar.gz.sha256`. The launcher downloads these names, so they are a contract.
+
+| Target | Built on |
+|---|---|
+| `aarch64-apple-darwin` | `macos-15` |
+| `x86_64-apple-darwin` | `macos-15`, cross-compiled |
+| `x86_64-unknown-linux-gnu` | `ubuntu-22.04` (glibc 2.35) |
+| `aarch64-unknown-linux-gnu` | `ubuntu-22.04-arm` |
+
+A published plugin pins the release named in its `bin/distill-version`. Until a release with
+that tag exists, launchers without an installed `distill` fail with the download error.
+
 ## Finding the binary
 
 Desktop apps often start hooks and MCP servers with a PATH that lacks the install directory.
-`bin/distill-launch` tries, in order: `$DISTILL_BIN`, the `bin_path` that `distill init`
-recorded in the config, `PATH`, then `~/.cargo/bin`, `/opt/homebrew/bin`, `/usr/local/bin`
-and `~/.local/bin`. When nothing is found, the hook exits 0 silently and the MCP server exits
-127 with a message.
+`bin/distill-launch` tries, in order:
+
+1. `$DISTILL_BIN`.
+2. The `bin_path` that `distill init` recorded in the config, unless it points into the
+   download directory below.
+3. `PATH`, then `~/.cargo/bin`, `/opt/homebrew/bin`, `/usr/local/bin` and `~/.local/bin`.
+4. The downloaded release: `<data dir>/bin/<version>/distill`, where `<version>` is the
+   content of `bin/distill-version`. The data dir is `~/Library/Application Support/Distill`
+   on macOS, `$XDG_DATA_HOME/distill` (default `~/.local/share/distill`) elsewhere, and
+   `$DISTILL_HOME/data` when that is set.
+
+When none exists, the MCP server's launcher downloads the release for the current platform
+with `curl`, checks it against the `.sha256` asset, and unpacks it into step 4's path.
+`DISTILL_RELEASES_URL` replaces the base URL
+`https://github.com/jackeydou/Distill/releases/download`. On failure it exits 127 with the
+reason on stderr: an unsupported platform, no `curl`, a failed download, or a checksum
+mismatch. The hook never downloads: with no binary it exits 0 silently, so a prompt never
+waits on the network.
+
+Older downloaded releases stay in `<data dir>/bin/`. Delete them by hand.
 
 The launcher is a POSIX shell script. Windows is not handled yet.
 
@@ -75,8 +111,11 @@ Distill is installed. If you have not read the distill skill in this session, re
 The agent is Codex when the input has `turn_id` (a Codex extension), Claude Code when
 `CLAUDECODE=1` is set, and otherwise is guessed from `transcript_path`. Without a known
 agent, session id and cwd, the `distill-source` line is left out. `distill-suggest` follows
-the `suggest.enabled` setting. Without a config, the hook injects one line asking the user to
-run `distill init`.
+the `suggest.enabled` setting. Without a config, the hook injects one line telling the agent to
+ask the user where to keep the vault and then run `distill init --vault "<their folder>"`; the
+skill's "First-time setup" lists the choices to offer. The command in it is `distill` when that
+name on `PATH` is the running binary, and the binary's quoted path otherwise, which is the case
+for a downloaded release.
 
 ## The MCP server
 

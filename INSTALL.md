@@ -9,8 +9,20 @@ steps that are already done, and ask the user only where a step says so.
 
 Check: `distill --version` prints `distill 0.0.1` or later.
 
-If it is missing, build it from a clone of `<source>`. It needs Rust, Node 22 and pnpm;
-`mise install` provides all three.
+The plugin downloads its own copy when it finds none (see
+[docs/plugin.md](docs/plugin.md#finding-the-binary)), but that copy is not on `PATH`, and steps 2
+and 4 run `distill` from a shell. If it is missing, install one of two ways.
+
+Prebuilt, from the GitHub release. Targets: `aarch64-apple-darwin`, `x86_64-apple-darwin`,
+`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`. Replace `<target>` and `<version>`
+(the latest release tag without the `v`), and check that `~/.local/bin` is on `PATH`:
+
+```bash
+mkdir -p ~/.local/bin && curl -fsSL https://github.com/jackeydou/Distill/releases/download/v<version>/distill-<target>.tar.gz | tar -xz -C ~/.local/bin distill
+```
+
+From source, in a clone of `<source>`. It needs Rust, Node 22 and pnpm; `mise install`
+provides all three.
 
 ```bash
 mise run install

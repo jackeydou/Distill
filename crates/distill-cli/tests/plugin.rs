@@ -132,11 +132,12 @@ fn outputs_hold_only_their_agents_files() {
                 .iter()
                 .any(|a| f.starts_with(&format!("{}/", a.name)))
         })
-        .filter(|f| f != "README.md" && f != "CHANGELOG.md")
+        .filter(|f| !["README.md", "CHANGELOG.md", "BUGFIX.md"].contains(&f.as_str()))
         .collect();
     for agent in &AGENTS {
         let mut expected = shared.clone();
         expected.extend(files(&src.join(agent.name)));
+        expected.insert("bin/distill-version".into());
         assert_eq!(
             files(&out.path().join(agent.name).join("plugins/distill")),
             expected,
@@ -168,4 +169,214 @@ fn build_id_goes_into_the_version() {
         manifest["version"].as_str().unwrap(),
         format!("{}+codex.abc1234", source["version"].as_str().unwrap())
     );
+}
+
+/// The `version` in `[workspace.package]`, the only unindented `version` line in Cargo.toml.
+fn workspace_version() -> String {
+    let manifest = std::fs::read_to_string(repo().join("Cargo.toml")).unwrap();
+    manifest
+        .lines()
+        .find_map(|l| l.strip_prefix("version = \""))
+        .and_then(|v| v.strip_suffix('"'))
+        .unwrap()
+        .to_string()
+}
+
+#[test]
+fn launcher_pins_the_workspace_version() {
+    let out = build(&["claude-code"]);
+    let pinned = std::fs::read_to_string(
+        out.path()
+            .join("claude-code/plugins/distill/bin/distill-version"),
+    )
+    .unwrap();
+    assert_eq!(pinned.trim(), workspace_version());
+}
+
+const TARGETS: [&str; 4] = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+];
+
+/// A built plugin, a fake release served over `file://`, and an empty home, so the launcher
+/// finds no installed `distill` and has to download one.
+struct Launch {
+    dir: tempfile::TempDir,
+    plugin: tempfile::TempDir,
+}
+
+impl Launch {
+    fn new() -> Option<Self> {
+        if ["/opt/homebrew/bin/distill", "/usr/local/bin/distill"]
+            .iter()
+            .any(|p| Path::new(p).exists())
+        {
+            eprintln!("skipped: a system-wide distill would be found before any download");
+            return None;
+        }
+        let launch = Self {
+            dir: tempfile::tempdir().unwrap(),
+            plugin: build(&["claude-code"]),
+        };
+        launch.release("#!/bin/sh\necho \"fake distill: $*\"\n");
+        Some(launch)
+    }
+
+    fn releases(&self) -> PathBuf {
+        self.dir.path().join("releases")
+    }
+
+    fn data(&self) -> PathBuf {
+        self.dir.path().join("distill-home/data")
+    }
+
+    /// Publishes `script` as the `distill` binary of the pinned release, for every target.
+    fn release(&self, script: &str) {
+        let stage = self.dir.path().join("stage");
+        std::fs::create_dir_all(&stage).unwrap();
+        std::fs::write(stage.join("distill"), script).unwrap();
+        let dest = self.releases().join(format!("v{}", workspace_version()));
+        std::fs::create_dir_all(&dest).unwrap();
+        for target in TARGETS {
+            let asset = format!("distill-{target}.tar.gz");
+            let status = Command::new("sh")
+                .arg("-c")
+                .arg(
+                    "chmod +x \"$1/distill\" && tar -czf \"$2/$3\" -C \"$1\" distill && cd \"$2\" \
+                     && { sha256sum \"$3\" 2>/dev/null || shasum -a 256 \"$3\"; } >\"$3.sha256\"",
+                )
+                .args([
+                    "sh",
+                    stage.to_str().unwrap(),
+                    dest.to_str().unwrap(),
+                    &asset,
+                ])
+                .status()
+                .unwrap();
+            assert!(status.success());
+        }
+    }
+
+    fn run(&self, args: &[&str]) -> std::process::Output {
+        let home = self.dir.path().join("home");
+        std::fs::create_dir_all(&home).unwrap();
+        Command::new(
+            self.plugin
+                .path()
+                .join("claude-code/plugins/distill/bin/distill-launch"),
+        )
+        .args(args)
+        .env_clear()
+        .env("HOME", &home)
+        .env("PATH", "/usr/bin:/bin")
+        .env("DISTILL_HOME", self.dir.path().join("distill-home"))
+        .env(
+            "DISTILL_RELEASES_URL",
+            format!("file://{}", self.releases().display()),
+        )
+        .stdin(Stdio::null())
+        .output()
+        .unwrap()
+    }
+
+    fn downloaded(&self) -> PathBuf {
+        self.data()
+            .join("bin")
+            .join(workspace_version())
+            .join("distill")
+    }
+}
+
+fn stdout(out: &std::process::Output) -> String {
+    String::from_utf8(out.stdout.clone()).unwrap()
+}
+
+fn stderr(out: &std::process::Output) -> String {
+    String::from_utf8(out.stderr.clone()).unwrap()
+}
+
+#[test]
+fn launcher_downloads_the_pinned_release_once() {
+    let Some(launch) = Launch::new() else { return };
+
+    let out = launch.run(&["mcp"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    // stdout is the MCP transport: only the binary may write to it.
+    assert_eq!(stdout(&out), "fake distill: mcp\n");
+    assert!(stderr(&out).contains("downloading distill"));
+    assert!(launch.downloaded().is_file());
+
+    std::fs::remove_dir_all(launch.releases()).unwrap();
+    let again = launch.run(&["stats"]);
+    assert!(again.status.success(), "{}", stderr(&again));
+    assert_eq!(stdout(&again), "fake distill: stats\n");
+    assert!(!stderr(&again).contains("downloading"));
+}
+
+#[test]
+fn launcher_hook_never_downloads() {
+    let Some(launch) = Launch::new() else { return };
+    let out = launch.run(&["hook", "user-prompt-submit"]);
+    assert!(out.status.success());
+    assert_eq!(stdout(&out), "");
+    assert!(!launch.data().exists());
+}
+
+#[test]
+fn launcher_refuses_a_bad_checksum() {
+    let Some(launch) = Launch::new() else { return };
+    let dest = launch.releases().join(format!("v{}", workspace_version()));
+    for target in TARGETS {
+        std::fs::write(
+            dest.join(format!("distill-{target}.tar.gz.sha256")),
+            format!("{}  distill-{target}.tar.gz\n", "0".repeat(64)),
+        )
+        .unwrap();
+    }
+    let out = launch.run(&["mcp"]);
+    assert_eq!(out.status.code(), Some(127));
+    assert!(
+        stderr(&out).contains("checksum mismatch"),
+        "{}",
+        stderr(&out)
+    );
+    assert!(!launch.downloaded().exists());
+}
+
+#[test]
+fn launcher_reports_a_missing_release() {
+    let Some(launch) = Launch::new() else { return };
+    std::fs::remove_dir_all(launch.releases()).unwrap();
+    let out = launch.run(&["mcp"]);
+    assert_eq!(out.status.code(), Some(127));
+    let err = stderr(&out);
+    assert!(
+        err.contains(&format!("release v{} exists", workspace_version())),
+        "{err}"
+    );
+}
+
+/// `distill init` run by a downloaded binary records its path; after the plugin pins a newer
+/// release, that older download must not shadow it.
+#[test]
+fn launcher_prefers_the_pinned_release_over_a_recorded_download() {
+    let Some(launch) = Launch::new() else { return };
+    let old = launch.data().join("bin/0.0.0/distill");
+    std::fs::create_dir_all(old.parent().unwrap()).unwrap();
+    std::fs::write(&old, "#!/bin/sh\necho old\n").unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&old, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let config = launch.dir.path().join("distill-home/config");
+    std::fs::create_dir_all(&config).unwrap();
+    std::fs::write(
+        config.join("config.toml"),
+        format!("bin_path = \"{}\"\n", old.display()),
+    )
+    .unwrap();
+
+    let out = launch.run(&["stats"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(stdout(&out), "fake distill: stats\n");
 }

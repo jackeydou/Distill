@@ -264,6 +264,10 @@ fn hook(env: &Env, stdin: &str, home: Option<&str>) -> String {
     if let Some(home) = home {
         cmd.env("DISTILL_HOME", home);
     }
+    hook_with(cmd, stdin)
+}
+
+fn hook_with(mut cmd: Command, stdin: &str) -> String {
     let mut child = cmd
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -286,6 +290,35 @@ fn hook(env: &Env, stdin: &str, home: Option<&str>) -> String {
         .as_str()
         .unwrap()
         .to_string()
+}
+
+/// A binary the plugin downloaded is not on PATH, so "run `distill init`" would not work.
+#[cfg(unix)]
+#[test]
+fn hook_names_an_init_command_that_runs() {
+    let env = Env::new();
+    let bin = std::fs::canonicalize(assert_cmd::cargo::cargo_bin("distill")).unwrap();
+    let not_set_up = |path: &std::path::Path| {
+        let mut cmd = env.command(&["hook", "user-prompt-submit"]);
+        cmd.env("DISTILL_HOME", "/nonexistent/distill")
+            .env("PATH", path);
+        hook_with(cmd, "{}")
+    };
+
+    let elsewhere = env.dir.path().join("empty");
+    std::fs::create_dir(&elsewhere).unwrap();
+    let text = not_set_up(&elsewhere);
+    let expected = if bin.to_str().unwrap().contains(' ') {
+        format!("`'{}' init --vault", bin.display())
+    } else {
+        format!("`{} init --vault", bin.display())
+    };
+    assert!(text.contains(&expected), "{text}");
+
+    let on_path = env.dir.path().join("on-path");
+    std::fs::create_dir(&on_path).unwrap();
+    std::os::unix::fs::symlink(&bin, on_path.join("distill")).unwrap();
+    assert!(not_set_up(&on_path).contains("`distill init --vault"));
 }
 
 #[test]

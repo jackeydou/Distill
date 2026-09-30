@@ -13,6 +13,9 @@
 #   plugins/distill/{bin,skills}     shared, into the plugin root
 #   plugins/distill/<agent>/         manifest, .mcp.json and hooks, into the plugin root
 #   packaging/<agent>/               marketplace manifest, into the output root
+# Generated:
+#   bin/distill-version              the workspace version from Cargo.toml: the release
+#                                    bin/distill-launch downloads when no distill is installed
 
 set -eu
 
@@ -20,6 +23,8 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 src="$root/plugins/distill"
 out="${DISTILL_PLUGIN_OUT:-$root/dist/plugins}"
 shared="bin skills"
+distill_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' "$root/Cargo.toml" | head -n 1)
+[ -n "$distill_version" ] || { echo "build-plugins: no version in $root/Cargo.toml" >&2; exit 2; }
 
 build_id=""
 if [ "${1:-}" = "--build" ]; then
@@ -41,6 +46,7 @@ build() { # <agent>
     cp -Rp "$src/$f" "$plugin/$f"
   done
   cp -Rp "$src/$1/." "$plugin/"
+  echo "$distill_version" >"$plugin/bin/distill-version"
   cp -Rp "$root/packaging/$1/." "$dest/"
   if [ -n "$build_id" ]; then
     jq --arg id "$1.$build_id" '.version += "+" + $id' "$plugin/$manifest" >"$plugin/$manifest.tmp"

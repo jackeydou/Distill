@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+- The hook's not-set-up line tells the agent to ask the user for a vault folder and run
+  `init --vault` itself. The command it names runs: `distill` when `distill` on PATH is the
+  running binary, otherwise the binary's quoted path, as for a copy the plugin downloaded.
+
 ### Added
 - `distill` commands: `init`, `save`, `recall`, `search`, `stats`, `tags`, `annotate`,
   `reindex`, `vault show|use|move`, `config list|get|set`, `doctor`. All accept `--json`.

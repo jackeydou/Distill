@@ -563,6 +563,14 @@ winget / Scoop。CI 在三个平台上都跑测试。
 自身路径（写在本机配置里）→ PATH → 常见安装位置。找不到时：hook 静默退出，绝不影响用户提问；
 MCP 工具返回错误，说明如何安装。
 
+> **2026-09-29 实现备注。** 从 marketplace 装插件的用户拿不到二进制：marketplace 分支只有插件，
+> 也没有任何预编译发布，只能从源码构建。改为：打 `v<version>` tag 时 CI 把 macOS、Linux 的
+> arm64 / x86_64 二进制发到 GitHub Releases；插件构建把 workspace 版本写进
+> `bin/distill-version`，启动脚本找不到 `distill` 时由 MCP server 下载这个版本并校验 SHA-256，
+> 放在本机数据目录。hook 仍然不联网。考虑过的另两条路：二进制直接提交进 marketplace 分支（每个
+> 平台约 44 MB，每次发布都进 git 历史，分支会越来越大）；只提供安装脚本（多一步手动操作，插件
+> 装完仍然不能用）。Windows、Homebrew tap 仍未做。现状见 `docs/plugin.md`。
+
 **对仓库规则的影响**：`AGENTS.md` 已相应更新（仓库结构、索引迁移、API 类型生成、版本字段、
 Rust 的错误处理写法）。`mise run check` 要同时覆盖 `cargo fmt --check`、
 `cargo clippy -D warnings`、`cargo test` 和前端检查，在 P1 搭仓库时写进 `mise.toml`。

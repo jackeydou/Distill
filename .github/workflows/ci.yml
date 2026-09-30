@@ -47,10 +47,11 @@ jobs:
           fetch-depth: 0
 
       # The build id is the last commit that touched the plugin, so the published version
-      # changes only when the plugin does. jq comes with the runner image.
+      # changes only when the plugin does. Cargo.toml is in the list because its version is
+      # the release the launcher downloads. jq comes with the runner image.
       - name: Build
         run: |
-          id=$(git log -1 --format=%H -- plugins/distill packaging scripts/build-plugins.sh | cut -c1-12)
+          id=$(git log -1 --format=%H -- plugins/distill packaging scripts/build-plugins.sh Cargo.toml | cut -c1-12)
           scripts/build-plugins.sh --build "$id" "$AGENT"
 
       - name: Publish to ${{ matrix.branch }}

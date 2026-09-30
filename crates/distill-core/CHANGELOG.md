@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+- `sources::prompt_context` takes the shell command for this binary and uses it in the
+  not-set-up line. Breaking for callers.
+
 ### Added
 - Vault format 1: notes, topics, tag aliases and annotations as Markdown/YAML files, with a
   `distill.toml` manifest. See `docs/vault-format.md`.

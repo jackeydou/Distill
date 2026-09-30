@@ -22,6 +22,30 @@ pub fn user_prompt_submit() {
         .ok()
         .and_then(|dirs| LocalConfig::load(&dirs).ok())
         .map(|config| config.suggest.enabled);
-    let context = prompt_context(&input, agent, suggest);
+    let context = prompt_context(&input, agent, suggest, &shell_command());
     println!("{}", hook_output(&context));
+}
+
+/// `distill` when that name on PATH is this binary, otherwise this binary's path quoted for a
+/// POSIX shell. Falls back to `distill` when the path is unknown; the hook must not fail.
+fn shell_command() -> String {
+    let Some(exe) = std::env::current_exe().and_then(std::fs::canonicalize).ok() else {
+        return "distill".into();
+    };
+    let on_path = std::env::var_os("PATH").is_some_and(|path| {
+        std::env::split_paths(&path)
+            .any(|dir| std::fs::canonicalize(dir.join("distill")).is_ok_and(|p| p == exe))
+    });
+    if on_path {
+        return "distill".into();
+    }
+    let exe = exe.to_string_lossy();
+    if exe
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "/._-+".contains(c))
+    {
+        exe.into_owned()
+    } else {
+        format!("'{}'", exe.replace('\'', r"'\''"))
+    }
 }

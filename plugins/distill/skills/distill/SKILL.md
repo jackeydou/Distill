@@ -17,11 +17,25 @@ Each user prompt carries lines injected by the Distill hook:
   after the session id and may contain spaces. Copy these values into `source` when saving.
   Never invent or edit them.
 - `distill-suggest: on` or `off` — whether you may offer to distill (section 2).
-- A line saying Distill is not set up: tell the user to run `distill init` if they ask for
-  Distill, and otherwise ignore Distill.
+- A line saying Distill is not set up: if the user asks for Distill, do the first-time setup
+  below; otherwise ignore Distill.
 
 No `distill-source` line means the hook is not running: you cannot save. Tell the user to run
 `distill doctor`.
+
+### First-time setup
+
+The vault is the folder holding the user's notes as Markdown files. Never pick it for them. Ask
+in one short message, offering:
+
+- On macOS with iCloud Drive: `icloud:Distill`, which syncs across their Macs.
+- `~/Documents/Distill`, on this device only.
+- A folder inside Dropbox, OneDrive or Syncthing.
+- If another device already has a vault: the synced copy of that folder.
+
+Then run the `init` command from the not-set-up line, exactly as written there, with their
+folder as `--vault`. It can be moved later with `distill vault move`. Once it succeeds, carry
+on with what the user asked; the tools work without a new session.
 
 ## 1. Before answering: recall
 
@@ -75,7 +89,7 @@ When `distill_save` returns an error:
 | new tag is close to an existing one | Use the existing tag. Resend with `confirm_new: true` only if it really means something else |
 | unknown topic | Call `distill_recall` again, or use `"new"` |
 | invalid source | Do not retry with other values. Tell the user to run `distill doctor` |
-| no Distill config | Tell the user to run `distill init` |
+| no Distill config | Do the first-time setup (see "What the hook gives you") |
 
 ## 4. The user asks about their history
 

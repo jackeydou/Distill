@@ -1,0 +1,86 @@
+name: Release
+
+# Pushing a tag `v<version>` builds `distill` for each target and publishes a GitHub release
+# holding `distill-<target>.tar.gz` and `distill-<target>.tar.gz.sha256`. The plugin launcher
+# downloads from these URLs, so the asset names are a contract; see docs/plugin.md.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-15
+          - target: x86_64-apple-darwin
+            os: macos-15
+          # The oldest supported runner, so the binary needs the oldest glibc we can offer.
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04-arm
+    runs-on: ${{ matrix.os }}
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag matches the workspace version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match version $version in Cargo.toml. Tag v$version, or bump the version first." >&2
+            exit 1
+          fi
+
+      - uses: jdx/mise-action@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: rustup target add "$TARGET"
+      - run: mise run web:build
+      - run: cargo build --release --locked -p distill-cli --target "$TARGET"
+
+      - name: Package
+        run: |
+          set -eu
+          asset="distill-$TARGET.tar.gz"
+          mkdir -p out
+          tar -czf "out/$asset" -C "target/$TARGET/release" distill
+          cd out
+          if command -v sha256sum >/dev/null; then
+            sha256sum "$asset" >"$asset.sha256"
+          else
+            shasum -a 256 "$asset" >"$asset.sha256"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distill-${{ matrix.target }}
+          path: out/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" out/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Prebuilt \`distill\` binaries. The plugin downloads the one for your platform; see INSTALL.md to install it on the command line."

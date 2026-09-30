@@ -45,12 +45,15 @@ const SKILL_HINT: &str = "Distill is installed. If you have not read the distill
 this session, read it now and follow its rules for when to recall past notes and when to offer \
 to distill.";
 
-const NOT_SET_UP: &str = "Distill is installed but not set up on this device. If the user asks \
-to distill or recall, tell them to run `distill init`.";
-
 /// The text the `UserPromptSubmit` hook injects. `suggest` is `None` when Distill has no
-/// config on this device yet.
-pub fn prompt_context(input: &HookInput, agent: Option<Agent>, suggest: Option<bool>) -> String {
+/// config on this device yet. `distill` is how a shell reaches this binary: `distill` when it
+/// is on PATH, otherwise its quoted path, because a copy the plugin downloaded is not on PATH.
+pub fn prompt_context(
+    input: &HookInput,
+    agent: Option<Agent>,
+    suggest: Option<bool>,
+    distill: &str,
+) -> String {
     let mut lines = Vec::new();
     if let (Some(agent), Some(session), Some(cwd)) =
         (agent, input.session_id.as_deref(), input.cwd.as_deref())
@@ -68,7 +71,11 @@ pub fn prompt_context(input: &HookInput, agent: Option<Agent>, suggest: Option<b
             ));
             lines.push(SKILL_HINT.to_string());
         }
-        None => lines.push(NOT_SET_UP.to_string()),
+        None => lines.push(format!(
+            "Distill is installed but not set up on this device. If the user asks to distill \
+             or recall, ask them where to keep their vault (the distill skill lists the \
+             choices), then run `{distill} init --vault \"<their folder>\"`."
+        )),
     }
     lines.join("\n")
 }
@@ -325,7 +332,12 @@ mod tests {
 
     #[test]
     fn context_lines() {
-        let text = prompt_context(&input(true, None), Some(Agent::Codex), Some(true));
+        let text = prompt_context(
+            &input(true, None),
+            Some(Agent::Codex),
+            Some(true),
+            "distill",
+        );
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(
             lines[0],
@@ -334,14 +346,21 @@ mod tests {
         assert_eq!(lines[1], "distill-suggest: on");
         assert!(lines[2].contains("distill skill"));
 
-        let off = prompt_context(&input(true, None), Some(Agent::Codex), Some(false));
+        let off = prompt_context(
+            &input(true, None),
+            Some(Agent::Codex),
+            Some(false),
+            "distill",
+        );
         assert!(off.contains("distill-suggest: off"));
 
-        let unknown_agent = prompt_context(&input(false, None), None, Some(true));
+        let unknown_agent = prompt_context(&input(false, None), None, Some(true), "distill");
         assert!(!unknown_agent.contains("distill-source"));
 
-        let not_set_up = prompt_context(&input(true, None), Some(Agent::Codex), None);
-        assert!(not_set_up.contains("distill init"));
+        let not_set_up = prompt_context(&input(true, None), Some(Agent::Codex), None, "distill");
+        assert!(not_set_up.contains("`distill init --vault"));
+        let downloaded = prompt_context(&input(true, None), None, None, "'/a b/distill'");
+        assert!(downloaded.contains("`'/a b/distill' init --vault"));
     }
 
     #[test]

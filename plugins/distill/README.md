@@ -1,8 +1,9 @@
 # Distill plugin
 
 The Codex and Claude Code plugin for Distill: a `UserPromptSubmit` hook, the `distill` MCP
-server and the `distill` skill. It needs the `distill` binary (0.0.1 or later) on the same
-machine, set up with `distill init`.
+server and the `distill` skill. It needs the `distill` binary, set up with `distill init`. When
+none is installed, the MCP server's launcher downloads the release the build pins in
+`bin/distill-version` from GitHub releases.
 
 Install: [INSTALL.md](../../INSTALL.md). How it works: [docs/plugin.md](../../docs/plugin.md).
 
@@ -18,4 +19,6 @@ Install: [INSTALL.md](../../INSTALL.md). How it works: [docs/plugin.md](../../do
 ## Limits
 
 - `bin/distill-launch` is a POSIX shell script; Windows is not handled yet.
+- Downloads cover macOS (arm64, x86_64) and Linux with glibc (arm64, x86_64), and need `curl`.
+  Elsewhere, install `distill` yourself.
 - In Claude Code the skill is invoked as `/distill:distill`; in Codex, ask for it by name.
