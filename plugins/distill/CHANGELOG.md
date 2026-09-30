@@ -10,8 +10,9 @@
 - First-time setup in the skill: when Distill is not set up, the agent asks the user where to
   keep the vault, never picking one itself, and runs `init --vault` with their answer.
 - `scripts/build-plugins.sh` writes `bin/distill-version` from the workspace version.
-- Release workflow: a `v<version>` tag publishes `distill` for macOS and Linux, arm64 and
-  x86_64, as `distill-<target>.tar.gz` plus a `.sha256`.
+- Release workflow: a `v<version>` tag publishes `distill` for Apple Silicon Macs and Linux
+  (arm64, x86_64) as `distill-<target>.tar.gz` plus a `.sha256`. No Intel Mac build: ort-sys
+  has no ONNX Runtime for it.
 - Plugin for Codex and Claude Code: `UserPromptSubmit` hook, `distill` MCP server, `distill`
   skill, and a launcher that finds the `distill` binary outside the app's PATH.
 - Per-agent builds in each agent's native layout: `scripts/build-plugins.sh`

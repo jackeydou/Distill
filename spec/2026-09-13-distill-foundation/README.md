@@ -564,8 +564,9 @@ winget / Scoop。CI 在三个平台上都跑测试。
 MCP 工具返回错误，说明如何安装。
 
 > **2026-09-29 实现备注。** 从 marketplace 装插件的用户拿不到二进制：marketplace 分支只有插件，
-> 也没有任何预编译发布，只能从源码构建。改为：打 `v<version>` tag 时 CI 把 macOS、Linux 的
-> arm64 / x86_64 二进制发到 GitHub Releases；插件构建把 workspace 版本写进
+> 也没有任何预编译发布，只能从源码构建。改为：打 `v<version>` tag 时 CI 把 Apple Silicon Mac、
+> Linux arm64 / x86_64 的二进制发到 GitHub Releases（没有 Intel Mac：ort-sys 不提供它的 ONNX
+> Runtime 预编译库，源码也编不过）；插件构建把 workspace 版本写进
 > `bin/distill-version`，启动脚本找不到 `distill` 时由 MCP server 下载这个版本并校验 SHA-256，
 > 放在本机数据目录。hook 仍然不联网。考虑过的另两条路：二进制直接提交进 marketplace 分支（每个
 > 平台约 44 MB，每次发布都进 git 历史，分支会越来越大）；只提供安装脚本（多一步手动操作，插件

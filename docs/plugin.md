@@ -63,7 +63,6 @@ with the web UI embedded and publishes a GitHub release with two assets per targ
 | Target | Built on |
 |---|---|
 | `aarch64-apple-darwin` | `macos-15` |
-| `x86_64-apple-darwin` | `macos-15`, cross-compiled |
 | `x86_64-unknown-linux-gnu` | `ubuntu-22.04` (glibc 2.35) |
 | `aarch64-unknown-linux-gnu` | `ubuntu-22.04-arm` |
 
@@ -86,6 +85,8 @@ Desktop apps often start hooks and MCP servers with a PATH that lacks the instal
 
 When none exists, the MCP server's launcher downloads the release for the current platform
 with `curl`, checks it against the `.sha256` asset, and unpacks it into step 4's path.
+There is no Intel Mac build: ort-sys, which links ONNX Runtime for embeddings, has no prebuilt
+library for `x86_64-apple-darwin`, so `distill` does not build there at all.
 `DISTILL_RELEASES_URL` replaces the base URL
 `https://github.com/jackeydou/Distill/releases/download`. On failure it exits 127 with the
 reason on stderr: an unsupported platform, no `curl`, a failed download, or a checksum

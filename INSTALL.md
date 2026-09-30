@@ -13,8 +13,8 @@ The plugin downloads its own copy when it finds none (see
 [docs/plugin.md](docs/plugin.md#finding-the-binary)), but that copy is not on `PATH`, and steps 2
 and 4 run `distill` from a shell. If it is missing, install one of two ways.
 
-Prebuilt, from the GitHub release. Targets: `aarch64-apple-darwin`, `x86_64-apple-darwin`,
-`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`. Replace `<target>` and `<version>`
+Prebuilt, from the GitHub release. Targets: `aarch64-apple-darwin` (Apple Silicon),
+`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`. Intel Macs are not supported. Replace `<target>` and `<version>`
 (the latest release tag without the `v`), and check that `~/.local/bin` is on `PATH`:
 
 ```bash
